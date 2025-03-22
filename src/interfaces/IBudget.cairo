@@ -11,18 +11,16 @@ pub trait IBudget<TContractState> {
         recipient: ContractAddress,
         amount: u128,
         category: felt252,
-        description: felt252
+        description: felt252,
     ) -> Result<u64, felt252>;
-    
+
     fn get_transaction(self: @TContractState, id: u64) -> Result<Transaction, felt252>;
-    
+
     // This function returns all transactions with pagination support
     fn get_transaction_history(
-        self: @TContractState, 
-        page: u64, 
-        page_size: u64
+        self: @TContractState, page: u64, page_size: u64,
     ) -> Result<Array<Transaction>, felt252>;
-    
+
     // This function returns the total count of transactions
     fn get_transaction_count(self: @TContractState) -> u64;
 }
