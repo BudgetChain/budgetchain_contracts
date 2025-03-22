@@ -1,12 +1,12 @@
 #[starknet::contract]
 mod Budget {
-    use budgetchain_contracts::base::types::{FundRequest, FundRequestStatus};
+    use budgetchain_contracts::base::types::{FundRequest};
     use budgetchain_contracts::interfaces::IBudget::IBudget;
     use core::array::ArrayTrait;
     use starknet::{ContractAddress};
     use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess,
-        StoragePointerReadAccess, StoragePointerWriteAccess,
+        Map, StorageMapReadAccess,
+        StoragePointerReadAccess,
     };
     use openzeppelin::access::ownable::{
         OwnableComponent // , interface::{IOwnableDispatcher, IOwnableDispatcherTrait}
@@ -69,44 +69,6 @@ mod Budget {
             };
 
             fund_requests_to_return
-        }
-
-        /// Releases funds for an approved request.
-        fn release_funds(
-            ref self: ContractState, org: ContractAddress, project_id: u64, request_id: u64,
-        ) {
-            let caller = starknet::get_caller_address();
-
-            // Ensure the caller is the organization (owner)
-            assert!(caller == self.owner.read(), "Unauthorized caller");
-
-            // Retrieve the fund request
-            let mut fund_request: FundRequest = self.fund_requests.read((project_id, request_id));
-
-            // Ensure the request is in Pending status
-            assert!(fund_request.status == FundRequestStatus::Pending, "Invalid request status");
-
-            // Retrieve the project's remaining budget
-            let mut remaining_budget = self.project_budgets.read(project_id);
-
-            // Ensure the project has enough budget
-            assert!(remaining_budget >= fund_request.amount, "Insufficient project budget");
-
-            // Update the request status to Approved
-            fund_request.status = FundRequestStatus::Approved;
-            self.fund_requests.write((project_id, request_id), fund_request);
-
-            // Deduct the amount from the project's remaining budget
-            remaining_budget -= fund_request.amount;
-            self.project_budgets.write(project_id, remaining_budget);
-
-            // Emit the FundsReleased event
-            self
-                .emit(
-                    Event::FundsReleased(
-                        FundsReleased { project_id, request_id, amount: fund_request.amount },
-                    ),
-                );
         }
 
         fn get_owner(self: @ContractState) -> ContractAddress {
