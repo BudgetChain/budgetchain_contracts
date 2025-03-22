@@ -4,6 +4,7 @@ pub mod interfaces {
 
 pub mod base {
     pub mod types;
+    pub mod errors;
 }
 
 pub mod budgetchain {
