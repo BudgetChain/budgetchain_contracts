@@ -30,3 +30,16 @@ mod HelloStarknet {
         }
     }
 }
+
+pub mod interfaces {
+    pub mod IBudget;
+}
+
+pub mod budgetchain {
+    pub mod Budget;
+}
+
+#[cfg(test)]
+mod tests {
+    mod test_Budget;
+}
