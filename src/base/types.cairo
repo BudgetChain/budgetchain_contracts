@@ -14,6 +14,7 @@ pub enum FundRequestStatus {
     Pending,
     Approved,
     Rejected,
+}
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct Transaction {

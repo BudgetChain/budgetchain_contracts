@@ -1,4 +1,3 @@
-
 use core::array::Array;
 use core::result::Result;
 use starknet::ContractAddress;
@@ -25,7 +24,7 @@ pub trait IBudget<TContractState> {
 
     // This function returns the total count of transactions
     fn get_transaction_count(self: @TContractState) -> u64;
-    
+
     fn get_fund_requests(self: @TContractState, project_id: u64) -> Array<FundRequest>;
     fn get_owner(self: @TContractState) -> ContractAddress;
 }

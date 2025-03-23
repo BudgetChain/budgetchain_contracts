@@ -32,8 +32,7 @@ pub mod Budget {
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
     }
-    
-  
+
 
     #[event]
     #[derive(Drop, starknet::Event)]
@@ -73,7 +72,7 @@ pub mod Budget {
         // Initialize contract state
         self.ownable.initializer(owner);
     }
-    
+
     #[abi(embed_v0)]
     impl BudgetImpl of IBudget<ContractState> {
         fn create_transaction(
@@ -149,7 +148,7 @@ pub mod Budget {
             // Simple implementation that returns a constant
             10
         }
-        
+
         /// Retrieves all fund requests for a given project ID.
         fn get_fund_requests(self: @ContractState, project_id: u64) -> Array<FundRequest> {
             let mut fund_requests_to_return = ArrayTrait::new();
