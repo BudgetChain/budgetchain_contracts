@@ -23,4 +23,13 @@ pub trait IBudget<TContractState> {
 
     // This function returns the total count of transactions
     fn get_transaction_count(self: @TContractState) -> u64;
+
+    fn allocate_project_budget(
+        ref self: TContractState,
+        org: ContractAddress,
+        project_owner: ContractAddress,
+        total_budget: u256,
+        milestone_descriptions: Array<felt252>,
+        milestone_amounts: Array<u256>,
+    ) -> u64;
 }

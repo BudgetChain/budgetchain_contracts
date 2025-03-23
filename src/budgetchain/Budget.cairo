@@ -6,7 +6,10 @@ pub mod Budget {
     use core::result::Result;
     use starknet::ContractAddress;
     use starknet::get_caller_address;
-    use budgetchain_contracts::base::types::Transaction;
+    use starknet::storage::{
+        StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry, Map,
+    };
+    use budgetchain_contracts::base::types::{Transaction, Project, Milestone};
     use budgetchain_contracts::interfaces::IBudget::IBudget;
 
     #[storage]
@@ -15,13 +18,17 @@ pub mod Budget {
         transaction_count: u64,
         transactions: LegacyMap<u64, Transaction>,
         // We'll use this to keep track of all transaction IDs
-        all_transaction_ids: LegacyMap<u64, u64> // index -> transaction_id
+        authorized_orgs: Map<ContractAddress, bool>,
+        project_count: u64,
+        projects: Map<u64, Project>,
+        milestones: Map<(u64, u32), Milestone>,
     }
 
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
         TransactionCreated: TransactionCreated,
+        ProjectAllocated: ProjectAllocated,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -35,11 +42,23 @@ pub mod Budget {
         description: felt252,
     }
 
+    #[derive(Drop, starknet::Event)]
+    struct ProjectAllocated {
+        project_id: u64,
+        org: ContractAddress,
+        project_owner: ContractAddress,
+        total_budget: u256,
+    }
+
     // Error codes
     const ERROR_INVALID_TRANSACTION_ID: felt252 = 'Invalid transaction ID';
     const ERROR_INVALID_PAGE: felt252 = 'Invalid page number';
     const ERROR_INVALID_PAGE_SIZE: felt252 = 'Invalid page size';
     const ERROR_NO_TRANSACTIONS: felt252 = 'No transactions found';
+    const UNAUTHORIZED: felt252 = 'Not authorized';
+    const CALLER_NOT_ORG: felt252 = 'Caller must be org';
+    const BUDGET_MISMATCH: felt252 = 'Milestone sum != total budget';
+    const ARRAY_LENGTH_MISMATCH: felt252 = 'Array lengths mismatch';
 
     #[abi(embed_v0)]
     impl BudgetImpl of IBudget<ContractState> {
@@ -115,6 +134,63 @@ pub mod Budget {
         fn get_transaction_count(self: @ContractState) -> u64 {
             // Simple implementation that returns a constant
             10
+        }
+
+        fn allocate_project_budget(
+            ref self: ContractState,
+            org: ContractAddress,
+            project_owner: ContractAddress,
+            total_budget: u256,
+            milestone_descriptions: Array<felt252>,
+            milestone_amounts: Array<u256>,
+        ) -> u64 {
+            let caller = get_caller_address();
+            assert(self.authorized_orgs.entry(org).read(), UNAUTHORIZED);
+            assert(caller == org, CALLER_NOT_ORG);
+
+            // Validation - arrays have the same length
+            let milestone_count = milestone_descriptions.len();
+            assert(milestone_count == milestone_amounts.len(), ARRAY_LENGTH_MISMATCH);
+
+            let mut sum: u256 = 0;
+            let mut i: u32 = 0;
+            while i < milestone_count {
+                sum += *milestone_amounts.at(i);
+                i += 1;
+            };
+            assert(sum == total_budget, 'Milestone sum != total budget');
+
+            let project_id = self.project_count.read();
+
+            let new_project = Project {
+                id: project_id, org: org, owner: project_owner, total_budget: total_budget,
+            };
+            self.projects.entry(project_id).write(new_project);
+
+            // Create milestone records
+            let mut j: u32 = 0;
+            while j < milestone_count {
+                self
+                    .milestones
+                    .entry((project_id, j))
+                    .write(
+                        Milestone {
+                            project_id: project_id,
+                            index: j,
+                            description: *milestone_descriptions.at(j),
+                            amount: *milestone_amounts.at(j),
+                            completed: false,
+                        },
+                    );
+                j += 1;
+            };
+
+            // Emit event
+            self.emit(ProjectAllocated { project_id, org, project_owner, total_budget });
+
+            self.project_count.write(project_id + 1);
+
+            project_id
         }
     }
 }
