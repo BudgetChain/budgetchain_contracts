@@ -1,12 +1,16 @@
 #[feature("deprecated_legacy_map")]
 #[starknet::contract]
 pub mod Budget {
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
     use core::array::Array;
     use core::array::ArrayTrait;
     use core::result::Result;
     use starknet::ContractAddress;
-    use starknet::get_caller_address;
-    use budgetchain_contracts::base::types::Transaction;
+    use starknet::{get_caller_address, get_block_timestamp};
+    use budgetchain_contracts::base::types::{Organization, Transaction};
     use budgetchain_contracts::interfaces::IBudget::IBudget;
 
     #[storage]
@@ -15,18 +19,24 @@ pub mod Budget {
         transaction_count: u64,
         transactions: LegacyMap<u64, Transaction>,
         // We'll use this to keep track of all transaction IDs
-        all_transaction_ids: LegacyMap<u64, u64> // index -> transaction_id
+        all_transaction_ids: LegacyMap<u64, u64>, // index -> transaction_id
+        admin: ContractAddress,
+        org_count: u256,
+        organizations: Map<u256, Organization>,
+        org_addresses: Map<ContractAddress, bool>,
+        org_list: Array<Organization>,
     }
 
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
         TransactionCreated: TransactionCreated,
+        OrganizationAdded: OrganizationAdded,
     }
 
     #[derive(Drop, starknet::Event)]
     struct TransactionCreated {
-        id: u64,
+        id: u256,
         sender: ContractAddress,
         recipient: ContractAddress,
         amount: u128,
@@ -35,12 +45,25 @@ pub mod Budget {
         description: felt252,
     }
 
+    #[derive(Drop, starknet::Event)]
+    pub struct OrganizationAdded {
+        pub id: u256,
+        pub address: ContractAddress,
+        pub name: felt252,
+    }
+
+
     // Error codes
     const ERROR_INVALID_TRANSACTION_ID: felt252 = 'Invalid transaction ID';
     const ERROR_INVALID_PAGE: felt252 = 'Invalid page number';
     const ERROR_INVALID_PAGE_SIZE: felt252 = 'Invalid page size';
     const ERROR_NO_TRANSACTIONS: felt252 = 'No transactions found';
-
+    const ONLY_ADMIN: felt252 = 'ONLY ADMIN';
+    #[constructor]
+    fn constructor(ref self: ContractState, admin: ContractAddress) {
+        // Store the values in contract state
+        self.admin.write(admin);
+    }
     #[abi(embed_v0)]
     impl BudgetImpl of IBudget<ContractState> {
         fn create_transaction(
@@ -115,6 +138,46 @@ pub mod Budget {
         fn get_transaction_count(self: @ContractState) -> u64 {
             // Simple implementation that returns a constant
             10
+        }
+
+        fn create_organization(
+            ref self: ContractState, name: felt252, org_address: ContractAddress, mission: felt252,
+        ) -> u256 {
+            // Ensure only the admin can add an organization
+
+            let admin = self.admin.read();
+            assert(admin == get_caller_address(), ONLY_ADMIN);
+
+            let created_at = get_block_timestamp();
+            // // Generate a unique organization ID
+            let org_id: u256 = self.org_count.read();
+
+            // Create and store the organization
+            let organization = Organization {
+                id: org_id,
+                address: org_address,
+                name,
+                is_active: true,
+                mission,
+                created_at: created_at,
+            };
+
+            // Emit an event
+            self.emit(OrganizationAdded { id: org_id, address: org_address, name: name });
+
+            self.org_count.write(org_id + 1);
+            self.organizations.write(org_id, organization);
+            self.org_addresses.write(org_address, true);
+
+            org_id
+        }
+
+        fn get_organization(self: @ContractState, org_id: u256) -> Organization {
+            let organization = self.organizations.read(org_id);
+            organization
+        }
+        fn get_admin(self: @ContractState) -> ContractAddress {
+            self.admin.read()
         }
     }
 }
