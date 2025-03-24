@@ -19,12 +19,10 @@ pub mod Budget {
         // Transaction storage
         transaction_count: u64,
         transactions: LegacyMap<u64, Transaction>,
-        // We'll use this to keep track of all transaction IDs
-
-        authorized_orgs: Map<ContractAddress, bool>,
         project_count: u64,
         projects: Map<u64, Project>,
         milestones: Map<(u64, u32), Milestone>,
+        // We'll use this to keep track of all transaction IDs
         all_transaction_ids: LegacyMap<u64, u64>, // index -> transaction_id
         admin: ContractAddress,
         org_count: u256,
@@ -35,29 +33,29 @@ pub mod Budget {
 
     #[event]
     #[derive(Drop, starknet::Event)]
-    enum Event {
+    pub enum Event {
         TransactionCreated: TransactionCreated,
         ProjectAllocated: ProjectAllocated,
         OrganizationAdded: OrganizationAdded,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct TransactionCreated {
-        id: u256,
-        sender: ContractAddress,
-        recipient: ContractAddress,
-        amount: u128,
-        timestamp: u64,
-        category: felt252,
-        description: felt252,
+    pub struct TransactionCreated {
+        pub id: u256,
+        pub sender: ContractAddress,
+        pub recipient: ContractAddress,
+        pub amount: u128,
+        pub timestamp: u64,
+        pub category: felt252,
+        pub description: felt252,
     }
 
     #[derive(Drop, starknet::Event)]
-    struct ProjectAllocated {
-        project_id: u64,
-        org: ContractAddress,
-        project_owner: ContractAddress,
-        total_budget: u256,
+    pub struct ProjectAllocated {
+        pub project_id: u64,
+        pub org: ContractAddress,
+        pub project_owner: ContractAddress,
+        pub total_budget: u256,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -168,7 +166,7 @@ pub mod Budget {
             milestone_amounts: Array<u256>,
         ) -> u64 {
             let caller = get_caller_address();
-            assert(self.authorized_orgs.entry(org).read(), UNAUTHORIZED);
+            assert(self.org_addresses.entry(org).read(), UNAUTHORIZED);
             assert(caller == org, CALLER_NOT_ORG);
 
             // Validation - arrays have the same length
@@ -246,6 +244,10 @@ pub mod Budget {
             self.org_addresses.write(org_address, true);
 
             org_id
+        }
+
+        fn get_milestone(self: @ContractState, project_id: u64, index: u32) -> Milestone {
+            self.milestones.entry((project_id, index)).read()
         }
 
         fn get_organization(self: @ContractState, org_id: u256) -> Organization {
