@@ -71,7 +71,7 @@ pub mod Budget {
     const ERROR_INVALID_PAGE: felt252 = 'Invalid page number';
     const ERROR_INVALID_PAGE_SIZE: felt252 = 'Invalid page size';
     const ERROR_NO_TRANSACTIONS: felt252 = 'No transactions found';
-    const ONLY_ADMIN: felt252 = 'Only admins are allowed access';
+    const ONLY_ADMIN: felt252 = 'ONLY ADMIN';
 
     #[constructor]
     fn constructor(ref self: ContractState, admin: ContractAddress) {
