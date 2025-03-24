@@ -343,4 +343,3 @@ fn test_allocate_project_budget_not_authorized() {
             org_address, proj_owner, 100, array!['Milestone1', 'Milestone2'], array![90, 10],
         );
 }
-
