@@ -2,7 +2,6 @@ use core::array::Array;
 use core::result::Result;
 use starknet::ContractAddress;
 use budgetchain_contracts::base::types::{FundRequest};
-use budgetchain_contracts::base::types::{Transaction, Organization};
 use budgetchain_contracts::base::types::{Transaction, Organization, Milestone};
 
 #[starknet::interface]

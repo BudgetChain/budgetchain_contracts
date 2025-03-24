@@ -63,15 +63,15 @@ pub mod Budget {
         description: felt252,
     }
     
-    pub struct TransactionCreated {
-        pub id: u256,
-        pub sender: ContractAddress,
-        pub recipient: ContractAddress,
-        pub amount: u128,
-        pub timestamp: u64,
-        pub category: felt252,
-        pub description: felt252,
-    }
+    // pub struct TransactionCreated {
+    //     pub id: u256,
+    //     pub sender: ContractAddress,
+    //     pub recipient: ContractAddress,
+    //     pub amount: u128,
+    //     pub timestamp: u64,
+    //     pub category: felt252,
+    //     pub description: felt252,
+    // }
 
     #[derive(Drop, starknet::Event)]
     pub struct ProjectAllocated {
