@@ -62,16 +62,6 @@ pub mod Budget {
         category: felt252,
         description: felt252,
     }
-    
-    // pub struct TransactionCreated {
-    //     pub id: u256,
-    //     pub sender: ContractAddress,
-    //     pub recipient: ContractAddress,
-    //     pub amount: u128,
-    //     pub timestamp: u64,
-    //     pub category: felt252,
-    //     pub description: felt252,
-    // }
 
     #[derive(Drop, starknet::Event)]
     pub struct ProjectAllocated {
@@ -87,7 +77,7 @@ pub mod Budget {
         pub address: ContractAddress,
         pub name: felt252,
     }
-    
+
     // Error codes
     const ERROR_INVALID_TRANSACTION_ID: felt252 = 'Invalid transaction ID';
     const ERROR_INVALID_PAGE: felt252 = 'Invalid page number';
@@ -224,7 +214,7 @@ pub mod Budget {
         fn set_fund_requests_counts(ref self: ContractState, project_id: u64, count: u64) {
             self.fund_requests_count.write(project_id, count);
         }
-        
+
         fn allocate_project_budget(
             ref self: ContractState,
             org: ContractAddress,
