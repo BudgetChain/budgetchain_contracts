@@ -1,7 +1,6 @@
 #[feature("deprecated_legacy_map")]
 #[starknet::contract]
 pub mod Budget {
-
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
@@ -85,7 +84,7 @@ pub mod Budget {
             // Simple implementation that returns a dummy transaction
             let dummy_transaction = Transaction {
                 id: id,
-                project_id: 0,  
+                project_id: 0,
                 sender: get_caller_address(),
                 recipient: get_caller_address(),
                 amount: 0,
@@ -147,59 +146,57 @@ pub mod Budget {
         }
 
 
-    // New function: Get all transactions for a specific project
-    fn get_project_transactions(
-        self: @ContractState,
-        project_id: u64,
-        page: u64,
-        page_size: u64,
-    ) -> Result<(Array<Transaction>, u64), felt252> {
-        if page_size == 0 {
-            return Result::Err(ERROR_INVALID_PAGE_SIZE);
-        }
-        if page == 0 {
-            return Result::Err(ERROR_INVALID_PAGE);
-        }
-    
-        let mut transactions_array = ArrayTrait::new();
-        let total_tx_count: u64 = self.transaction_count.read();
-    
-        let mut i: u64 = 0;
-        while i < total_tx_count {
-            let transaction_id = self.all_transaction_ids.read(i);
-            let transaction = self.transactions.read(transaction_id);
-    
-            if transaction.project_id == project_id {
-                transactions_array.append(transaction);
+        // New function: Get all transactions for a specific project
+        fn get_project_transactions(
+            self: @ContractState, project_id: u64, page: u64, page_size: u64,
+        ) -> Result<(Array<Transaction>, u64), felt252> {
+            if page_size == 0 {
+                return Result::Err(ERROR_INVALID_PAGE_SIZE);
             }
-            i += 1;
-        };
-    
-        if transactions_array.len() == 0 {
-            return Result::Err(ERROR_NO_TRANSACTIONS);
-        }
-    
-        let start_index = (page - 1) * page_size;
-        let end_index = start_index + page_size;
-        let total_transactions: u64 = transactions_array.len().into();
-    
-        if start_index >= total_transactions {
-            return Result::Err(ERROR_INVALID_PAGE);
-        }
-    
-        let mut paginated_transactions = ArrayTrait::<Transaction>::new();
-        let mut j: u64 = start_index;
-        
-        while j < end_index && j < total_transactions {
-            if let Option::Some(boxed_tx) = transactions_array.get(j.try_into().unwrap()) {
-                let transaction: Transaction = *boxed_tx.unbox();  
-                paginated_transactions.append(transaction);
+            if page == 0 {
+                return Result::Err(ERROR_INVALID_PAGE);
             }
-            j += 1;
-        };
-        
-    
-        Result::Ok((paginated_transactions, total_transactions.into()))
+
+            let mut transactions_array = ArrayTrait::new();
+            let total_tx_count: u64 = self.transaction_count.read();
+
+            let mut i: u64 = 0;
+            while i < total_tx_count {
+                let transaction_id = self.all_transaction_ids.read(i);
+                let transaction = self.transactions.read(transaction_id);
+
+                if transaction.project_id == project_id {
+                    transactions_array.append(transaction);
+                }
+                i += 1;
+            };
+
+            if transactions_array.len() == 0 {
+                return Result::Err(ERROR_NO_TRANSACTIONS);
+            }
+
+            let start_index = (page - 1) * page_size;
+            let end_index = start_index + page_size;
+            let total_transactions: u64 = transactions_array.len().into();
+
+            if start_index >= total_transactions {
+                return Result::Err(ERROR_INVALID_PAGE);
+            }
+
+            let mut paginated_transactions = ArrayTrait::<Transaction>::new();
+            let mut j: u64 = start_index;
+
+            while j < end_index && j < total_transactions {
+                if let Option::Some(boxed_tx) = transactions_array.get(j.try_into().unwrap()) {
+                    let transaction: Transaction = *boxed_tx.unbox();
+                    paginated_transactions.append(transaction);
+                }
+                j += 1;
+            };
+
+            Result::Ok((paginated_transactions, total_transactions.into()))
+        }
+
 
         fn create_organization(
             ref self: ContractState, name: felt252, org_address: ContractAddress, mission: felt252,
@@ -240,8 +237,5 @@ pub mod Budget {
         fn get_admin(self: @ContractState) -> ContractAddress {
             self.admin.read()
         }
-
     }
-    
-}
 }
