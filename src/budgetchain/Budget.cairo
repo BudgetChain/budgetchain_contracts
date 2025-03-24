@@ -12,10 +12,6 @@ pub mod Budget {
     use starknet::{get_caller_address, get_block_timestamp};
     use budgetchain_contracts::base::types::{Organization, Transaction};
     use budgetchain_contracts::interfaces::IBudget::IBudget;
-    use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess,
-    };
     use budgetchain_contracts::base::types::{FundRequest};
 
     #[storage]
@@ -28,7 +24,7 @@ pub mod Budget {
         all_transaction_ids: LegacyMap<u64, u64>, // index -> transaction_id
         fund_requests: Map::<(u64, u64), FundRequest>, // Key: (project_id, request_id)
         fund_requests_count: Map::<u64, u64>, // Key: project_id, Value: count of requests
-        project_budgets: Map::<u64, u128> // Key: project_id, Value: remaining budget
+        project_budgets: Map::<u64, u128>, // Key: project_id, Value: remaining budget
         org_count: u256,
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
@@ -75,6 +71,7 @@ pub mod Budget {
     const ERROR_INVALID_PAGE: felt252 = 'Invalid page number';
     const ERROR_INVALID_PAGE_SIZE: felt252 = 'Invalid page size';
     const ERROR_NO_TRANSACTIONS: felt252 = 'No transactions found';
+    const ONLY_ADMIN: felt252 = 'Only admins are allowed access';
 
     #[constructor]
     fn constructor(ref self: ContractState, admin: ContractAddress) {
@@ -83,7 +80,7 @@ pub mod Budget {
         self.fund_requests_count.write(0, 0);
         self.project_budgets.write(0, 0);
     }
-    
+
     #[abi(embed_v0)]
     impl BudgetImpl of IBudget<ContractState> {
         fn create_transaction(
@@ -201,7 +198,7 @@ pub mod Budget {
         fn set_fund_requests_counts(ref self: ContractState, project_id: u64, count: u64) {
             self.fund_requests_count.write(project_id, count);
         }
-        
+
         fn create_organization(
             ref self: ContractState, name: felt252, org_address: ContractAddress, mission: felt252,
         ) -> u256 {
@@ -237,9 +234,6 @@ pub mod Budget {
         fn get_organization(self: @ContractState, org_id: u256) -> Organization {
             let organization = self.organizations.read(org_id);
             organization
-        }
-        fn get_admin(self: @ContractState) -> ContractAddress {
-            self.admin.read()
         }
     }
 }
