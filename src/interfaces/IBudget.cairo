@@ -1,7 +1,7 @@
 use core::array::Array;
 use core::result::Result;
 use starknet::ContractAddress;
-use budgetchain_contracts::base::types::Transaction;
+use budgetchain_contracts::base::types::{Transaction, Organization};
 
 #[starknet::interface]
 pub trait IBudget<TContractState> {
@@ -31,5 +31,10 @@ pub trait IBudget<TContractState> {
         total_budget: u256,
         milestone_descriptions: Array<felt252>,
         milestone_amounts: Array<u256>,
-    ) -> u64;
+    ) -> u64; 
+    fn create_organization(
+        ref self: TContractState, name: felt252, org_address: ContractAddress, mission: felt252,
+    ) -> u256;
+    fn get_organization(self: @TContractState, org_id: u256) -> Organization;
+    fn get_admin(self: @TContractState) -> ContractAddress;
 }

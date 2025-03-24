@@ -1,15 +1,20 @@
 #[feature("deprecated_legacy_map")]
 #[starknet::contract]
 pub mod Budget {
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
     use core::array::Array;
     use core::array::ArrayTrait;
     use core::result::Result;
     use starknet::ContractAddress;
-    use starknet::get_caller_address;
     use starknet::storage::{
         StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry, Map,
     };
-    use budgetchain_contracts::base::types::{Transaction, Project, Milestone};
+    use budgetchain_contracts::base::types::{Organization, Transaction, Project, Milestone};
+    use starknet::{get_caller_address, get_block_timestamp};
+
     use budgetchain_contracts::interfaces::IBudget::IBudget;
 
     #[storage]
@@ -18,10 +23,17 @@ pub mod Budget {
         transaction_count: u64,
         transactions: LegacyMap<u64, Transaction>,
         // We'll use this to keep track of all transaction IDs
+
         authorized_orgs: Map<ContractAddress, bool>,
         project_count: u64,
         projects: Map<u64, Project>,
         milestones: Map<(u64, u32), Milestone>,
+        all_transaction_ids: LegacyMap<u64, u64>, // index -> transaction_id
+        admin: ContractAddress,
+        org_count: u256,
+        organizations: Map<u256, Organization>,
+        org_addresses: Map<ContractAddress, bool>,
+        org_list: Array<Organization>,
     }
 
     #[event]
@@ -29,11 +41,13 @@ pub mod Budget {
     enum Event {
         TransactionCreated: TransactionCreated,
         ProjectAllocated: ProjectAllocated,
+        OrganizationAdded: OrganizationAdded,
+
     }
 
     #[derive(Drop, starknet::Event)]
     struct TransactionCreated {
-        id: u64,
+        id: u256,
         sender: ContractAddress,
         recipient: ContractAddress,
         amount: u128,
@@ -50,6 +64,12 @@ pub mod Budget {
         total_budget: u256,
     }
 
+    #[derive(Drop, starknet::Event)]
+    pub struct OrganizationAdded {
+        pub id: u256,
+        pub address: ContractAddress,
+        pub name: felt252,
+    }
     // Error codes
     const ERROR_INVALID_TRANSACTION_ID: felt252 = 'Invalid transaction ID';
     const ERROR_INVALID_PAGE: felt252 = 'Invalid page number';
@@ -59,6 +79,13 @@ pub mod Budget {
     const CALLER_NOT_ORG: felt252 = 'Caller must be org';
     const BUDGET_MISMATCH: felt252 = 'Milestone sum != total budget';
     const ARRAY_LENGTH_MISMATCH: felt252 = 'Array lengths mismatch';
+
+    const ONLY_ADMIN: felt252 = 'ONLY ADMIN';
+    #[constructor]
+    fn constructor(ref self: ContractState, admin: ContractAddress) {
+        // Store the values in contract state
+        self.admin.write(admin);
+    }
 
     #[abi(embed_v0)]
     impl BudgetImpl of IBudget<ContractState> {
@@ -191,6 +218,46 @@ pub mod Budget {
             self.project_count.write(project_id + 1);
 
             project_id
+           }
+
+        fn create_organization(
+            ref self: ContractState, name: felt252, org_address: ContractAddress, mission: felt252,
+        ) -> u256 {
+            // Ensure only the admin can add an organization
+
+            let admin = self.admin.read();
+            assert(admin == get_caller_address(), ONLY_ADMIN);
+
+            let created_at = get_block_timestamp();
+            // // Generate a unique organization ID
+            let org_id: u256 = self.org_count.read();
+
+            // Create and store the organization
+            let organization = Organization {
+                id: org_id,
+                address: org_address,
+                name,
+                is_active: true,
+                mission,
+                created_at: created_at,
+            };
+
+            // Emit an event
+            self.emit(OrganizationAdded { id: org_id, address: org_address, name: name });
+
+            self.org_count.write(org_id + 1);
+            self.organizations.write(org_id, organization);
+            self.org_addresses.write(org_address, true);
+
+            org_id
+        }
+
+        fn get_organization(self: @ContractState, org_id: u256) -> Organization {
+            let organization = self.organizations.read(org_id);
+            organization
+        }
+        fn get_admin(self: @ContractState) -> ContractAddress {
+            self.admin.read()
         }
     }
 }

@@ -26,4 +26,12 @@ pub struct Milestone {
     pub description: felt252,
     pub amount: u256,
     pub completed: bool,
+
+pub struct Organization {
+    pub id: u256,
+    pub address: ContractAddress,
+    pub name: felt252,
+    pub is_active: bool,
+    pub mission: felt252,
+    pub created_at: u64,
 }
