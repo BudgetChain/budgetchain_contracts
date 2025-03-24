@@ -13,9 +13,11 @@ pub mod Budget {
     use starknet::{get_caller_address, get_block_timestamp};
 
     use budgetchain_contracts::interfaces::IBudget::IBudget;
+    use budgetchain_contracts::base::types::{FundRequest};
 
     #[storage]
     struct Storage {
+        admin: ContractAddress,
         // Transaction storage
         transaction_count: u64,
         transactions: LegacyMap<u64, Transaction>,
@@ -24,30 +26,41 @@ pub mod Budget {
         milestones: Map<(u64, u32), Milestone>,
         // We'll use this to keep track of all transaction IDs
         all_transaction_ids: LegacyMap<u64, u64>, // index -> transaction_id
-        admin: ContractAddress,
+        fund_requests: Map::<(u64, u64), FundRequest>, // Key: (project_id, request_id)
+        fund_requests_count: Map::<u64, u64>, // Key: project_id, Value: count of requests
+        project_budgets: Map::<u64, u128>, // Key: project_id, Value: remaining budget
         org_count: u256,
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
         org_list: Array<Organization>,
     }
 
+
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
+        FundsReleased: FundsReleased,
         TransactionCreated: TransactionCreated,
         ProjectAllocated: ProjectAllocated,
         OrganizationAdded: OrganizationAdded,
     }
 
     #[derive(Drop, starknet::Event)]
-    pub struct TransactionCreated {
-        pub id: u256,
-        pub sender: ContractAddress,
-        pub recipient: ContractAddress,
-        pub amount: u128,
-        pub timestamp: u64,
-        pub category: felt252,
-        pub description: felt252,
+    pub struct FundsReleased {
+        project_id: u64,
+        request_id: u64,
+        amount: u128,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct TransactionCreated {
+        id: u256,
+        sender: ContractAddress,
+        recipient: ContractAddress,
+        amount: u128,
+        timestamp: u64,
+        category: felt252,
+        description: felt252,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -64,6 +77,7 @@ pub mod Budget {
         pub address: ContractAddress,
         pub name: felt252,
     }
+
     // Error codes
     const ERROR_INVALID_TRANSACTION_ID: felt252 = 'Invalid transaction ID';
     const ERROR_INVALID_PAGE: felt252 = 'Invalid page number';
@@ -73,12 +87,14 @@ pub mod Budget {
     const CALLER_NOT_ORG: felt252 = 'Caller must be org';
     const BUDGET_MISMATCH: felt252 = 'Milestone sum != total budget';
     const ARRAY_LENGTH_MISMATCH: felt252 = 'Array lengths mismatch';
-
     const ONLY_ADMIN: felt252 = 'ONLY ADMIN';
+
     #[constructor]
     fn constructor(ref self: ContractState, admin: ContractAddress) {
-        // Store the values in contract state
+        // Initialize contract state
         self.admin.write(admin);
+        self.fund_requests_count.write(0, 0);
+        self.project_budgets.write(0, 0);
     }
 
     #[abi(embed_v0)]
@@ -155,6 +171,48 @@ pub mod Budget {
         fn get_transaction_count(self: @ContractState) -> u64 {
             // Simple implementation that returns a constant
             10
+        }
+
+        // Retrieves all fund requests for a given project ID.
+        fn get_fund_requests(self: @ContractState, project_id: u64) -> Array<FundRequest> {
+            let mut fund_requests_to_return = ArrayTrait::new();
+
+            // Get the total count of fund requests for this project
+            let count = self.fund_requests_count.read(project_id);
+            assert!(count > 0, "No fund requests found for this project ID");
+
+            // Loop through all fund requests for the project
+            let mut current_index = 0;
+
+            while current_index < count {
+                let fund_request = self.fund_requests.read((project_id, current_index));
+                fund_requests_to_return.append(fund_request);
+                current_index += 1;
+            };
+
+            fund_requests_to_return
+        }
+
+        fn get_admin(self: @ContractState) -> ContractAddress {
+            self.admin.read()
+        }
+
+        fn set_fund_requests(ref self: ContractState, fund_request: FundRequest, budget_id: u64) {
+            self.fund_requests.write((fund_request.project_id, budget_id), fund_request);
+
+            // Update the count for this project
+            let current_max_id = self.fund_requests_count.read(fund_request.project_id);
+            if budget_id >= current_max_id {
+                self.fund_requests_count.write(fund_request.project_id, budget_id + 1_u64);
+            }
+        }
+
+        fn get_fund_requests_counts(self: @ContractState, project_id: u64) -> u64 {
+            self.fund_requests_count.read(project_id)
+        }
+
+        fn set_fund_requests_counts(ref self: ContractState, project_id: u64, count: u64) {
+            self.fund_requests_count.write(project_id, count);
         }
 
         fn allocate_project_budget(
@@ -253,9 +311,6 @@ pub mod Budget {
         fn get_organization(self: @ContractState, org_id: u256) -> Organization {
             let organization = self.organizations.read(org_id);
             organization
-        }
-        fn get_admin(self: @ContractState) -> ContractAddress {
-            self.admin.read()
         }
     }
 }
