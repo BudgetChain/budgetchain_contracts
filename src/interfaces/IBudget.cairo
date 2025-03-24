@@ -23,8 +23,10 @@ pub trait IBudget<TContractState> {
     ) -> Result<Array<Transaction>, felt252>;
 
     // This function returns the total count of transactions
+    fn set_fund_requests(ref self: TContractState, fund_request: FundRequest, budget_id: u64);
+    fn set_fund_requests_counts(ref self: TContractState, project_id: u64, count: u64);
+    fn get_fund_requests_counts(self: @TContractState, project_id: u64) -> u64;
     fn get_transaction_count(self: @TContractState) -> u64;
-
     fn get_fund_requests(self: @TContractState, project_id: u64) -> Array<FundRequest>;
-    fn get_owner(self: @TContractState) -> ContractAddress;
+    fn get_admin(self: @TContractState) -> ContractAddress;
 }

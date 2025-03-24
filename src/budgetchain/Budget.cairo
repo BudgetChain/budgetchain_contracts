@@ -8,29 +8,23 @@ pub mod Budget {
     use starknet::get_caller_address;
     use budgetchain_contracts::base::types::Transaction;
     use budgetchain_contracts::interfaces::IBudget::IBudget;
-    use starknet::storage::{Map, StorageMapReadAccess, StoragePointerReadAccess};
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
     use budgetchain_contracts::base::types::{FundRequest};
-    use openzeppelin::access::ownable::{OwnableComponent};
-
-    component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
-
-    #[abi(embed_v0)]
-    impl OwnableImpl = OwnableComponent::OwnableMixinImpl<ContractState>;
-    impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
 
     #[storage]
     struct Storage {
+        admin: ContractAddress,
         // Transaction storage
         transaction_count: u64,
         transactions: LegacyMap<u64, Transaction>,
         // We'll use this to keep track of all transaction IDs
         all_transaction_ids: LegacyMap<u64, u64>, // index -> transaction_id
-        owner: ContractAddress,
         fund_requests: Map::<(u64, u64), FundRequest>, // Key: (project_id, request_id)
         fund_requests_count: Map::<u64, u64>, // Key: project_id, Value: count of requests
-        project_budgets: Map::<u64, u128>, // Key: project_id, Value: remaining budget
-        #[substorage(v0)]
-        ownable: OwnableComponent::Storage,
+        project_budgets: Map::<u64, u128> // Key: project_id, Value: remaining budget
     }
 
 
@@ -38,8 +32,6 @@ pub mod Budget {
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         FundsReleased: FundsReleased,
-        #[flat]
-        OwnableEvent: OwnableComponent::Event,
         TransactionCreated: TransactionCreated,
     }
 
@@ -68,9 +60,11 @@ pub mod Budget {
     const ERROR_NO_TRANSACTIONS: felt252 = 'No transactions found';
 
     #[constructor]
-    fn constructor(ref self: ContractState, owner: ContractAddress) {
+    fn constructor(ref self: ContractState, admin: ContractAddress) {
         // Initialize contract state
-        self.ownable.initializer(owner);
+        self.admin.write(admin);
+        self.fund_requests_count.write(0, 0);
+        self.project_budgets.write(0, 0);
     }
 
     #[abi(embed_v0)]
@@ -169,8 +163,26 @@ pub mod Budget {
             fund_requests_to_return
         }
 
-        fn get_owner(self: @ContractState) -> ContractAddress {
-            self.owner.read()
+        fn get_admin(self: @ContractState) -> ContractAddress {
+            self.admin.read()
+        }
+
+        fn set_fund_requests(ref self: ContractState, fund_request: FundRequest, budget_id: u64) {
+            self.fund_requests.write((fund_request.project_id, budget_id), fund_request);
+
+            // Update the count for this project
+            let current_max_id = self.fund_requests_count.read(fund_request.project_id);
+            if budget_id >= current_max_id {
+                self.fund_requests_count.write(fund_request.project_id, budget_id + 1_u64);
+            }
+        }
+
+        fn get_fund_requests_counts(self: @ContractState, project_id: u64) -> u64 {
+            self.fund_requests_count.read(project_id)
+        }
+
+        fn set_fund_requests_counts(ref self: ContractState, project_id: u64, count: u64) {
+            self.fund_requests_count.write(project_id, count);
         }
     }
 }
