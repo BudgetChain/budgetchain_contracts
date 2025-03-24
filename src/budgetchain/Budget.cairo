@@ -51,8 +51,6 @@ pub mod Budget {
     }
 
     #[derive(Drop, starknet::Event)]
-
-
     pub struct FundsReleased {
         project_id: u64,
         request_id: u64,
@@ -182,7 +180,6 @@ pub mod Budget {
             // Simple implementation that returns a constant
             10
         }
-
 
 
         // New function: Get all transactions for a specific project
