@@ -1,14 +1,16 @@
 #[feature("deprecated_legacy_map")]
 #[starknet::contract]
 pub mod Budget {
-    use core::array::Array;
+    use starknet::storage::StorageMapReadAccess;
+use core::array::Array;
     use core::array::ArrayTrait;
     use core::result::Result;
     use starknet::ContractAddress;
     use starknet::get_caller_address;
     use budgetchain_contracts::base::types::Transaction;
     use budgetchain_contracts::interfaces::IBudget::IBudget;
-
+    use starknet::storage::{StoragePointerReadAccess};
+    use core::option::Option;
     #[storage]
     struct Storage {
         // Transaction storage
@@ -27,6 +29,7 @@ pub mod Budget {
     #[derive(Drop, starknet::Event)]
     struct TransactionCreated {
         id: u64,
+        project_id: u64,
         sender: ContractAddress,
         recipient: ContractAddress,
         amount: u128,
@@ -58,6 +61,7 @@ pub mod Budget {
             // Simple implementation that returns a dummy transaction
             let dummy_transaction = Transaction {
                 id: id,
+                project_id: 0,  
                 sender: get_caller_address(),
                 recipient: get_caller_address(),
                 amount: 0,
@@ -97,6 +101,7 @@ pub mod Budget {
 
                 let dummy_tx = Transaction {
                     id: tx_id,
+                    project_id: tx_id,
                     sender: get_caller_address(),
                     recipient: get_caller_address(),
                     amount: (tx_id * 100).into(),
@@ -116,5 +121,60 @@ pub mod Budget {
             // Simple implementation that returns a constant
             10
         }
-    }
+
+    // New function: Get all transactions for a specific project
+    fn get_project_transactions(
+        self: @ContractState,
+        project_id: u64,
+        page: u64,
+        page_size: u64,
+    ) -> Result<(Array<Transaction>, u64), felt252> {
+        // Validate inputs
+        if page_size == 0 {
+            return Result::Err(ERROR_INVALID_PAGE_SIZE);
+        }
+        if page == 0 {
+            return Result::Err(ERROR_INVALID_PAGE);
+        }
+    
+        // Create an array to hold the transactions
+        let mut transactions_array = ArrayTrait::new();
+    
+        // Loop through all transactions
+        let mut i = 0;
+        while i < self.transaction_count.read() {
+            let transaction_id = self.all_transaction_ids.read(i);
+            let transaction = self.transactions.read(transaction_id);
+            // Check if the transaction belongs to the specified project
+            if transaction.project_id == project_id {
+                transactions_array.append(transaction);
+            }
+            i += 1;
+        };
+    
+        // Check if there are any transactions
+        if transactions_array.len() == 0 {
+            return Result::Err(ERROR_NO_TRANSACTIONS);
+        }
+    
+        // Calculate pagination
+        let start_index = (page - 1) * page_size;
+        let end_index = start_index + page_size;
+    
+        if start_index >= transactions_array.len() {
+            return Result::Err(ERROR_INVALID_PAGE);
+        }
+    
+        // Slice the transactions for the requested page
+        let mut paginated_transactions = ArrayTrait::new();
+        let mut j = start_index;
+        while j < end_index && j < transactions_array.len() {
+            paginated_transactions.append(transactions_array[j]);
+            j += 1;
+        }
+    
+        // Return the paginated transactions and the total count
+        Result::Ok((paginated_transactions, transactions_array.len()))
+     }
+   }
 }
