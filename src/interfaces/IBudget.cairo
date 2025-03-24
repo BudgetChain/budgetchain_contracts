@@ -31,7 +31,8 @@ pub trait IBudget<TContractState> {
         total_budget: u256,
         milestone_descriptions: Array<felt252>,
         milestone_amounts: Array<u256>,
-    ) -> u64; 
+    ) -> u64;
+
     fn create_organization(
         ref self: TContractState, name: felt252, org_address: ContractAddress, mission: felt252,
     ) -> u256;

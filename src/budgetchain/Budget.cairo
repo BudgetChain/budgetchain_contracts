@@ -3,15 +3,12 @@
 pub mod Budget {
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess,
+        StoragePointerWriteAccess, StoragePathEntry,
     };
     use core::array::Array;
     use core::array::ArrayTrait;
     use core::result::Result;
     use starknet::ContractAddress;
-    use starknet::storage::{
-        StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry, Map,
-    };
     use budgetchain_contracts::base::types::{Organization, Transaction, Project, Milestone};
     use starknet::{get_caller_address, get_block_timestamp};
 
@@ -42,7 +39,6 @@ pub mod Budget {
         TransactionCreated: TransactionCreated,
         ProjectAllocated: ProjectAllocated,
         OrganizationAdded: OrganizationAdded,
-
     }
 
     #[derive(Drop, starknet::Event)]
@@ -218,7 +214,7 @@ pub mod Budget {
             self.project_count.write(project_id + 1);
 
             project_id
-           }
+        }
 
         fn create_organization(
             ref self: ContractState, name: felt252, org_address: ContractAddress, mission: felt252,

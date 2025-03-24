@@ -26,7 +26,9 @@ pub struct Milestone {
     pub description: felt252,
     pub amount: u256,
     pub completed: bool,
+}
 
+#[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct Organization {
     pub id: u256,
     pub address: ContractAddress,
