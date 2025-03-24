@@ -24,5 +24,12 @@ pub trait IBudget<TContractState> {
     // This function returns the total count of transactions
     fn get_transaction_count(self: @TContractState) -> u64;
 
-     fn get_project_transactions(self: @TContractState, project_id: u64) -> Array<Transaction>;
+
+    fn get_project_transactions(
+        self: @TContractState,
+        project_id: u64,
+        page: u64,
+        page_size: u64,
+    ) -> Result<(Array<Transaction>, u64), felt252>;
 }
+

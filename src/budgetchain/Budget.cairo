@@ -129,7 +129,6 @@ use core::array::Array;
         page: u64,
         page_size: u64,
     ) -> Result<(Array<Transaction>, u64), felt252> {
-        // Validate inputs
         if page_size == 0 {
             return Result::Err(ERROR_INVALID_PAGE_SIZE);
         }
@@ -137,44 +136,46 @@ use core::array::Array;
             return Result::Err(ERROR_INVALID_PAGE);
         }
     
-        // Create an array to hold the transactions
         let mut transactions_array = ArrayTrait::new();
+        let total_tx_count: u64 = self.transaction_count.read();
     
-        // Loop through all transactions
-        let mut i = 0;
-        while i < self.transaction_count.read() {
+        let mut i: u64 = 0;
+        while i < total_tx_count {
             let transaction_id = self.all_transaction_ids.read(i);
             let transaction = self.transactions.read(transaction_id);
-            // Check if the transaction belongs to the specified project
+    
             if transaction.project_id == project_id {
                 transactions_array.append(transaction);
             }
             i += 1;
         };
     
-        // Check if there are any transactions
         if transactions_array.len() == 0 {
             return Result::Err(ERROR_NO_TRANSACTIONS);
         }
     
-        // Calculate pagination
         let start_index = (page - 1) * page_size;
         let end_index = start_index + page_size;
+        let total_transactions: u64 = transactions_array.len().into();
     
-        if start_index >= transactions_array.len() {
+        if start_index >= total_transactions {
             return Result::Err(ERROR_INVALID_PAGE);
         }
     
-        // Slice the transactions for the requested page
-        let mut paginated_transactions = ArrayTrait::new();
-        let mut j = start_index;
-        while j < end_index && j < transactions_array.len() {
-            paginated_transactions.append(transactions_array[j]);
+        let mut paginated_transactions = ArrayTrait::<Transaction>::new();
+        let mut j: u64 = start_index;
+        
+        while j < end_index && j < total_transactions {
+            if let Option::Some(boxed_tx) = transactions_array.get(j.try_into().unwrap()) {
+                let transaction: Transaction = *boxed_tx.unbox();  
+                paginated_transactions.append(transaction);
+            }
             j += 1;
-        }
+        };
+        
     
-        // Return the paginated transactions and the total count
-        Result::Ok((paginated_transactions, transactions_array.len()))
-     }
-   }
+        Result::Ok((paginated_transactions, total_transactions.into()))
+    }
+    
+}
 }
