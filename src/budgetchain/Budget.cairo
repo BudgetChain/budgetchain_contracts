@@ -107,156 +107,6 @@ pub mod Budget {
 
     #[abi(embed_v0)]
     impl BudgetImpl of IBudget<ContractState> {
-        // Organization management
-        fn add_organization(ref self: ContractState, org: ContractAddress) {
-            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
-            self.organizations.entry(org).write(true);
-
-            // Grant organization role
-            self.accesscontrol._grant_role(ORGANIZATION_ROLE, org);
-
-            self.emit(Event::OrganizationAdded(OrganizationAdded { org }));
-        }
-
-        fn remove_organization(ref self: ContractState, org: ContractAddress) {
-            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
-            self.organizations.entry(org).write(false);
-
-            // Revoke organization role
-            self.accesscontrol._revoke_role(ORGANIZATION_ROLE, org);
-
-            self.emit(Event::OrganizationRemoved(OrganizationRemoved { org }));
-        }
-
-        fn is_organization(self: @ContractState, org: ContractAddress) -> bool {
-            self.organizations.entry(org).read()
-        }
-
-        // Project Management
-        fn create_project(
-            ref self: ContractState,
-            project_id: u64,
-            organization: ContractAddress,
-            total_budget: u256,
-        ) {
-            // Only admin can create projects
-            self.accesscontrol.assert_only_role(ORGANIZATION_ROLE);
-
-            // Ensure the organization is registered
-            assert(self.organizations.entry(organization).read(), ERROR_ONLY_ORGANIZATION);
-
-            // Create the project
-            let project = Project { organization, total_budget, remaining_budget: total_budget };
-
-            // Store the project
-            self.projects.entry(project_id).write(project);
-        }
-
-        /// Get project details
-        fn get_project(self: @ContractState, project_id: u64) -> Project {
-            self.projects.entry(project_id).read()
-        }
-
-        // Milestone Management
-        fn create_milestone(
-            ref self: ContractState,
-            project_id: u64,
-            milestone_id: u64,
-            description: felt252,
-            amount: u256,
-            is_completed: bool,
-        ) {
-            // Only admin can create milestones
-            self.accesscontrol.assert_only_role(ORGANIZATION_ROLE);
-
-            // Verify project exists
-            let project = self.projects.entry(project_id).read();
-            assert(project.organization == get_caller_address(), ERROR_CALLER_NOT_AUTHORIZED);
-
-            // Create milestone
-            let milestone = Milestone {
-                project_id,
-                milestone_description: description,
-                milestone_amount: amount,
-                is_completed,
-                is_released: false,
-            };
-
-            // Store the milestone
-            self.milestones.entry(project_id).entry(milestone_id).write(milestone);
-        }
-
-        /// Get milestone details
-        fn get_milestone(self: @ContractState, project_id: u64, milestone_id: u64) -> Milestone {
-            self.milestones.entry(project_id).entry(milestone_id).read()
-        }
-
-        /// Marks a milestone as complete
-        fn complete_milestone(ref self: ContractState, project_id: u64, milestone_id: u64) {
-            // Only organization can mark milestones as complete
-            self.accesscontrol.assert_only_role(ORGANIZATION_ROLE);
-
-            // Verify project exists and caller is the project's organization
-            let project = self.projects.entry(project_id).read();
-            assert(project.organization == get_caller_address(), ERROR_CALLER_NOT_AUTHORIZED);
-
-            // Verify milestone exists
-            let mut milestone = self.milestones.entry(project_id).entry(milestone_id).read();
-            assert(milestone.project_id == project_id, ERROR_INVALID_MILESTONE);
-
-            // Verify milestone is not already completed
-            assert(milestone.is_completed != true, ERROR_MILESTONE_ALREADY_COMPLETED);
-
-            // Mark milestone as completed
-            milestone.is_completed = true;
-            self.milestones.entry(project_id).entry(milestone_id).write(milestone);
-
-            // Emit event
-            self.emit(Event::MilestoneCompleted(MilestoneCompleted { project_id, milestone_id }));
-        }
-
-        // Fund Request Management
-        fn create_fund_request(
-            ref self: ContractState,
-            project_id: u64,
-            request_id: u64,
-            milestone_id: u64,
-            amount: u256,
-            requester: ContractAddress,
-        ) {
-            // Only admin can create fund requests
-            self.accesscontrol.assert_only_role(ORGANIZATION_ROLE);
-
-            // Verify project exists
-            let project = self.projects.entry(project_id).read();
-            assert(project.organization != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
-
-            // Verify milestone exists
-            let milestone = self.milestones.entry(project_id).entry(milestone_id).read();
-            assert(milestone.project_id == project_id, ERROR_INVALID_MILESTONE);
-
-            // Create fund request
-            let fund_request = FundRequest {
-                project_id, milestone_id, amount, requester, status: FundRequestStatus::Pending,
-            };
-
-            // Store the fund request
-            self.fund_requests.entry(project_id).entry(request_id).write(fund_request);
-        }
-
-        /// Get fund request details
-        fn get_fund_request(self: @ContractState, project_id: u64, request_id: u64) -> FundRequest {
-            self.fund_requests.entry(project_id).entry(request_id).read()
-        }
-
-        // Get admin
-        fn get_admin(self: @ContractState) -> ContractAddress {
-            // Verify caller is default admin
-            self.accesscontrol.assert_only_role(DEFAULT_ADMIN_ROLE);
-
-            self.admin.read()
-        }
-
         /// Allows authorized organizations to release funds for approved requests
         fn release_funds(
             ref self: ContractState, org: ContractAddress, project_id: u64, request_id: u64,
@@ -335,6 +185,16 @@ pub mod Budget {
                 );
         }
 
+        /// Get project details
+        fn get_project(self: @ContractState, project_id: u64) -> Project {
+            self.projects.entry(project_id).read()
+        }
+
+        /// Get milestone details
+        fn get_milestone(self: @ContractState, project_id: u64, milestone_id: u64) -> Milestone {
+            self.milestones.entry(project_id).entry(milestone_id).read()
+        }
+
         /// Transaction related getters
         fn get_transaction_count(self: @ContractState) -> u64 {
             self.transaction_counter.read()
@@ -347,21 +207,6 @@ pub mod Budget {
             );
             // Transaction IDs are 1-based, but array indices are 0-based
             self.all_transactions.at(transaction_id - 1).read()
-        }
-
-        fn get_project_transactions(self: @ContractState, project_id: u64) -> Array<u64> {
-            let tx_ids_vec = self.project_transaction_ids.entry(project_id);
-            let mut result: Array<u64> = ArrayTrait::new();
-
-            let mut i: u64 = 0;
-            let len = tx_ids_vec.len();
-
-            while i < len {
-                result.append(tx_ids_vec.at(i).read());
-                i += 1;
-            };
-
-            result
         }
     }
 }
