@@ -10,4 +10,3 @@ pub struct Transaction {
     pub timestamp: u64,
     pub category: felt252,
     pub description: felt252,
-}
