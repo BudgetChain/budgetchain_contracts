@@ -3,14 +3,14 @@
 pub mod Budget {
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess,
+        StoragePointerWriteAccess, StoragePathEntry,
     };
     use core::array::Array;
     use core::array::ArrayTrait;
     use core::result::Result;
     use starknet::ContractAddress;
     use starknet::{get_caller_address, get_block_timestamp};
-    use budgetchain_contracts::base::types::{Organization, Transaction};
+    use budgetchain_contracts::base::types::{Organization, Transaction, Milestone};
     use budgetchain_contracts::interfaces::IBudget::IBudget;
 
     #[storage]
@@ -25,6 +25,8 @@ pub mod Budget {
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
         org_list: Array<Organization>,
+        milestones: Map<(u256, u256), Milestone>, // (organization, project) -> Milestone
+        org_milestones: Map<u256, u256> // org to number of milesones they have
     }
 
     #[event]
@@ -32,6 +34,7 @@ pub mod Budget {
     enum Event {
         TransactionCreated: TransactionCreated,
         OrganizationAdded: OrganizationAdded,
+        MilestoneCreated: MilestoneCreated,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -52,6 +55,15 @@ pub mod Budget {
         pub name: felt252,
     }
 
+
+    #[derive(Drop, starknet::Event)]
+    pub struct MilestoneCreated {
+        pub organization: u256,
+        pub project_id: u64,
+        pub milestone_description: felt252,
+        pub milestone_amount: u256,
+        pub created_at: u64,
+    }
 
     // Error codes
     const ERROR_INVALID_TRANSACTION_ID: felt252 = 'Invalid transaction ID';
@@ -172,12 +184,46 @@ pub mod Budget {
             org_id
         }
 
+
+        fn create_milestone(
+            ref self: ContractState,
+            org: u256,
+            project_id: u64,
+            milestone_description: felt252,
+            milestone_amount: u256,
+        ) -> u256 {
+            let admin = self.admin.read();
+            assert(admin == get_caller_address(), ONLY_ADMIN);
+
+            let created_at = get_block_timestamp();
+
+            let new_milestone: Milestone = Milestone {
+                organization: org,
+                project_id: project_id,
+                milestone_description: milestone_description,
+                milestone_amount: milestone_amount,
+                created_at: created_at,
+            };
+            // read the number of the curernt milestones the organization has
+            let current_milestone = self.org_milestones.read(org);
+
+            self.milestones.entry((org, current_milestone + 1)).write(new_milestone);
+            self.org_milestones.entry(org).write(current_milestone + 1);
+
+            current_milestone
+
+        }
+
         fn get_organization(self: @ContractState, org_id: u256) -> Organization {
             let organization = self.organizations.read(org_id);
             organization
         }
         fn get_admin(self: @ContractState) -> ContractAddress {
             self.admin.read()
+        }
+
+        fn get_milestone(self: @ContractState, milestone_id: u256 ) -> Milestone {
+            self.milesones.entry((org_id, milestone_id)).read()
         }
     }
 }

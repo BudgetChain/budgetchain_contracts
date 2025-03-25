@@ -20,3 +20,12 @@ pub struct Organization {
     pub mission: felt252,
     pub created_at: u64,
 }
+
+#[derive(Copy, Drop, Serde, starknet::Store)]
+pub struct Milestone {
+    pub organization: u256,
+    pub project_id: u64,
+    pub milestone_description: felt252,
+    pub milestone_amount: u256,
+    pub created_at: u64,
+}
