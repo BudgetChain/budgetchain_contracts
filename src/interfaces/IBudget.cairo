@@ -29,6 +29,10 @@ pub trait IBudget<TContractState> {
     fn get_transaction_count(self: @TContractState) -> u64;
     fn get_fund_requests(self: @TContractState, project_id: u64) -> Array<FundRequest>;
 
+
+    fn get_project_transactions(
+        self: @TContractState, project_id: u64, page: u64, page_size: u64,
+    ) -> Result<(Array<Transaction>, u64), felt252>;
     fn allocate_project_budget(
         ref self: TContractState,
         org: ContractAddress,
@@ -45,3 +49,4 @@ pub trait IBudget<TContractState> {
     fn get_organization(self: @TContractState, org_id: u256) -> Organization;
     fn get_admin(self: @TContractState) -> ContractAddress;
 }
+

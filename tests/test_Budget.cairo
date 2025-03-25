@@ -45,6 +45,7 @@ mod tests {
     fn test_transaction_struct() {
         let tx = Transaction {
             id: 1,
+            project_id: 1,
             sender: contract_address_const::<1>(),
             recipient: contract_address_const::<2>(),
             amount: 1000_u128,
