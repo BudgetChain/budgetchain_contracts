@@ -43,7 +43,6 @@ pub trait IBudget<TContractState> {
         milestone_amounts: Array<u256>,
     ) -> u64;
 
-    fn get_milestone(self: @TContractState, project_id: u64, index: u32) -> Milestone;
     fn create_organization(
         ref self: TContractState, name: felt252, org_address: ContractAddress, mission: felt252,
     ) -> u256;
@@ -52,12 +51,12 @@ pub trait IBudget<TContractState> {
 
     fn create_milestone(
         ref self: TContractState,
-        org: u256,
+        org: ContractAddress,
         project_id: u64,
         milestone_description: felt252,
         milestone_amount: u256,
-    ) -> u256;
+    ) -> u32;
 
-    fn get_milestone(self: @TContractState, org_id: u256, milestone_id: u256) -> Milestone;
+    fn get_milestone(self: @TContractState, project_id: u64, milestone_id: u32) -> Milestone;
 }
 
