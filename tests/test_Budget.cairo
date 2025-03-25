@@ -187,4 +187,31 @@ mod tests {
             j += 1_u32;
         }
     }
+
+    #[test]
+    fn should_get_project_remaining_budget() {
+        let (contract_address, admin_address) = setup();
+
+        let dispatcher = IBudgetDispatcher { contract_address };
+
+        let org_address = contract_address_const::<'Organization'>();
+        let name = 'John';
+        let mission = 'Help the Poor';
+        let proj_owner = contract_address_const::<'Owner'>();
+
+        start_cheat_caller_address(contract_address, admin_address);
+        dispatcher.create_organization(name, org_address, mission);
+        stop_cheat_caller_address(admin_address);
+
+        start_cheat_caller_address(contract_address, org_address);
+        let project_id = dispatcher
+            .allocate_project_budget(
+                org_address, proj_owner, 100, array!['Milestone1', 'Milestone2'], array![90, 10],
+            );
+        stop_cheat_caller_address(org_address);
+
+        let remaining_budget = dispatcher.get_project_remaining_budget(project_id);
+        assert(remaining_budget == 100, 'incorrect remaining budget');
+    }
 }
+
