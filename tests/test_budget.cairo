@@ -1,7 +1,8 @@
 use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
+use budgetchain_contracts::budgetchain::Budget;
 use snforge_std::{
     CheatSpan, ContractClassTrait, DeclareResultTrait, stop_cheat_caller_address,
-    cheat_caller_address, declare,
+    cheat_caller_address, declare, spy_events, EventSpyAssertionsTrait,
 };
 use starknet::{ContractAddress, contract_address_const};
 
@@ -213,3 +214,135 @@ fn test_create_milestone_data_saved() {
     );
     assert(first_milestone.milestone_amount == milestone_amount, 'Org amount id didnt match');
 }
+fn test_allocate_project_budget_success() {
+    let (contract_address, admin_address) = setup();
+
+    let org_address = contract_address_const::<'Organization'>();
+    let name = 'John';
+    let mission = 'Help the Poor';
+    let proj_owner = contract_address_const::<'Owner'>();
+    let mut spy = spy_events();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_organization(name, org_address, mission);
+    stop_cheat_caller_address(admin_address);
+
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org_address, proj_owner, 100, array!['Milestone1', 'Milestone2'], array![90, 10],
+        );
+    stop_cheat_caller_address(org_address);
+
+    spy
+        .assert_emitted(
+            @array![
+                (
+                    contract_address,
+                    Budget::Budget::Event::ProjectAllocated(
+                        Budget::Budget::ProjectAllocated {
+                            project_id,
+                            org: org_address,
+                            project_owner: proj_owner,
+                            total_budget: 100,
+                        },
+                    ),
+                ),
+            ],
+        );
+    let milestone1 = dispatcher.get_milestone(project_id, 0);
+    let milestone2 = dispatcher.get_milestone(project_id, 1);
+    assert(milestone1.description == 'Milestone1', 'incorrect milestone description');
+    assert(milestone2.description == 'Milestone2', 'incorrect milestone description');
+    assert(milestone1.amount == 90, 'incorrect amount');
+    assert(milestone2.amount == 10, 'incorrect amount');
+}
+
+#[test]
+#[should_panic(expected: 'Caller must be org')]
+fn test_allocate_project_budget_not_org() {
+    let (contract_address, admin_address) = setup();
+
+    let org_address = contract_address_const::<'Organization'>();
+    let name = 'John';
+    let mission = 'Help the Poor';
+    let proj_owner = contract_address_const::<'Owner'>();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_organization(name, org_address, mission);
+    stop_cheat_caller_address(admin_address);
+
+    dispatcher
+        .allocate_project_budget(
+            org_address, proj_owner, 100, array!['Milestone1', 'Milestone2'], array![90, 10],
+        );
+}
+
+#[test]
+#[should_panic(expected: 'Milestone sum != total budget')]
+fn test_allocate_project_budget_total_budget_mismatch() {
+    let (contract_address, admin_address) = setup();
+
+    let org_address = contract_address_const::<'Organization'>();
+    let name = 'John';
+    let mission = 'Help the Poor';
+    let proj_owner = contract_address_const::<'Owner'>();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_organization(name, org_address, mission);
+    stop_cheat_caller_address(admin_address);
+
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    dispatcher
+        .allocate_project_budget(
+            org_address, proj_owner, 100, array!['Milestone1', 'Milestone2'], array![90, 100],
+        );
+    stop_cheat_caller_address(org_address);
+}
+
+#[test]
+#[should_panic(expected: 'Array lengths mismatch')]
+fn test_allocate_project_budget_array_mismatch() {
+    let (contract_address, admin_address) = setup();
+
+    let org_address = contract_address_const::<'Organization'>();
+    let name = 'John';
+    let mission = 'Help the Poor';
+    let proj_owner = contract_address_const::<'Owner'>();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_organization(name, org_address, mission);
+    stop_cheat_caller_address(admin_address);
+
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    dispatcher
+        .allocate_project_budget(
+            org_address, proj_owner, 100, array!['Milestone1', 'Milestone2'], array![90, 5, 5],
+        );
+    stop_cheat_caller_address(org_address);
+}
+
+#[test]
+#[should_panic(expected: 'Not authorized')]
+fn test_allocate_project_budget_not_authorized() {
+    let (contract_address, _) = setup();
+
+    let org_address = contract_address_const::<'Organization'>();
+    let proj_owner = contract_address_const::<'Owner'>();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    dispatcher
+        .allocate_project_budget(
+            org_address, proj_owner, 100, array!['Milestone1', 'Milestone2'], array![90, 10],
+        );
+}
+
