@@ -48,5 +48,6 @@ pub trait IBudget<TContractState> {
     ) -> u256;
     fn get_organization(self: @TContractState, org_id: u256) -> Organization;
     fn get_admin(self: @TContractState) -> ContractAddress;
+    fn get_project_remaining_budget(self: @TContractState, project_id: u64) -> u256;
 }
 
