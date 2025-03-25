@@ -25,7 +25,7 @@ pub mod Budget {
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
         org_list: Array<Organization>,
-        milestones: Map<(u256, u256), Milestone>, // (organization, project) -> Milestone
+        milestones: Map<(u256, u256), Milestone>, // (organization, milestone id) -> Milestone
         org_milestones: Map<u256, u256> // org to number of milesones they have
     }
 
@@ -210,8 +210,7 @@ pub mod Budget {
             self.milestones.entry((org, current_milestone + 1)).write(new_milestone);
             self.org_milestones.entry(org).write(current_milestone + 1);
 
-            current_milestone
-
+            current_milestone + 1
         }
 
         fn get_organization(self: @ContractState, org_id: u256) -> Organization {
@@ -222,8 +221,8 @@ pub mod Budget {
             self.admin.read()
         }
 
-        fn get_milestone(self: @ContractState, milestone_id: u256 ) -> Milestone {
-            self.milesones.entry((org_id, milestone_id)).read()
+        fn get_milestone(self: @ContractState, org_id: u256, milestone_id: u256) -> Milestone {
+            self.milestones.entry((org_id, milestone_id)).read()
         }
     }
 }

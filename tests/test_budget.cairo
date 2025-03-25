@@ -128,7 +128,7 @@ fn test_create_two_organization() {
 }
 
 #[test]
-fn test_create_milestone_successfully(){
+fn test_create_milestone_successfully() {
     let (contract_address, admin_address) = setup();
 
     let dispatcher = IBudgetDispatcher { contract_address };
@@ -145,7 +145,7 @@ fn test_create_milestone_successfully(){
 
 
 #[test]
-fn test_create_multiple_milestone_successfully(){
+fn test_create_multiple_milestone_successfully() {
     let (contract_address, admin_address) = setup();
 
     let dispatcher = IBudgetDispatcher { contract_address };
@@ -163,24 +163,29 @@ fn test_create_multiple_milestone_successfully(){
 
 #[test]
 #[should_panic(expected: 'ONLY ADMIN')]
-fn test_create_milestone_should_panic_if_not_organization(){
-    let (contract_address, admin_address) = setup();
+fn test_create_milestone_should_panic_if_not_organization() {
+    let (contract_address, _) = setup();
 
     let dispatcher = IBudgetDispatcher { contract_address };
+
+    let not_admin = contract_address_const::<'not_admin'>();
 
     let name = 'John';
     let org_address = contract_address_const::<'Organization 1'>();
     let mission = 'Help the Poor';
 
-    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    cheat_caller_address(contract_address, not_admin, CheatSpan::Indefinite);
     let org0_id = dispatcher.create_organization(name, org_address, mission);
-    stop_cheat_caller_address(admin_address);
     dispatcher.create_milestone(org0_id, 12, 'Feed Dogs in Lekki', 2);
+    stop_cheat_caller_address(not_admin);
+    println!("Organization id: {}", org0_id);
+
+    assert(org0_id == 0, '1st Org ID is 0');
 }
 
 
 #[test]
-fn test_create_milestone_data_saved(){
+fn test_create_milestone_data_saved() {
     let (contract_address, admin_address) = setup();
 
     let dispatcher = IBudgetDispatcher { contract_address };
@@ -188,12 +193,23 @@ fn test_create_milestone_data_saved(){
     let name = 'John';
     let org_address = contract_address_const::<'Organization 1'>();
     let mission = 'Help the Poor';
+    let project_id = 12;
+    let milestone_description = 'Feed Dogs in Lekki';
+    let milestone_amount = 2;
 
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
     let org0_id = dispatcher.create_organization(name, org_address, mission);
-    let milestone_id = dispatcher.create_milestone(org0_id, 12, 'Feed Dogs in Lekki', 2);
+    let milestone_id = dispatcher
+        .create_milestone(org0_id, project_id, milestone_description, milestone_amount);
     stop_cheat_caller_address(admin_address);
 
+    let first_milestone = dispatcher.get_milestone(org0_id, milestone_id);
     assert(milestone_id == 1, 'Milestone not saved');
-    asser()
+    assert(first_milestone.organization == org0_id, 'Org didnt create the miestone');
+    assert(first_milestone.project_id == 12, 'Org project id didnt match');
+    assert(
+        first_milestone.milestone_description == milestone_description,
+        'Org description id didnt match',
+    );
+    assert(first_milestone.milestone_amount == milestone_amount, 'Org amount id didnt match');
 }

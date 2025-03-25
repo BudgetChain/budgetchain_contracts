@@ -37,5 +37,5 @@ pub trait IBudget<TContractState> {
         milestone_amount: u256,
     ) -> u256;
 
-    fn get_milestone(self: @TContractState, milestone_id: u256 ) -> Milestone;
+    fn get_milestone(self: @TContractState, org_id: u256, milestone_id: u256) -> Milestone;
 }
