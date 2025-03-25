@@ -31,12 +31,17 @@ pub mod Budget {
         // We'll use this to keep track of all transaction IDs
         all_transaction_ids: LegacyMap<u64, u64>, // index -> transaction_id
         fund_requests: Map::<(u64, u64), FundRequest>, // Key: (project_id, request_id)
+        fund_request: Map<u64, (u64, u64, ContractAddress)>,
         fund_requests_count: Map::<u64, u64>, // Key: project_id, Value: count of requests
         project_budgets: Map::<u64, u128>, // Key: project_id, Value: remaining budget
         org_count: u256,
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
         org_list: Array<Organization>,
+        _fund_request_counter: u64,
+        milestone_funds_released: LegacyMap<(u64, u64), bool>,
+        project_owners: LegacyMap<u64, ContractAddress>,
+        milestone_statuses: LegacyMap<(u64, u64), bool>,
         milestones: Map<(u64, u32), Milestone>, // (project, milestone id) -> Milestone
         org_milestones: Map<ContractAddress, u32> // org to number of milesones they have
     }
@@ -50,6 +55,14 @@ pub mod Budget {
         ProjectAllocated: ProjectAllocated,
         OrganizationAdded: OrganizationAdded,
         MilestoneCreated: MilestoneCreated,
+        FundsRequested: FundsRequested,
+    }
+    
+    #[derive(Drop, starknet::Event)]
+    struct FundsRequested {
+        project_id: u64,
+        request_id: u64,
+        milestone_id: u64,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -106,6 +119,9 @@ pub mod Budget {
     const BUDGET_MISMATCH: felt252 = 'Milestone sum != total budget';
     const ARRAY_LENGTH_MISMATCH: felt252 = 'Array lengths mismatch';
     const ONLY_ADMIN: felt252 = 'ONLY ADMIN';
+    const ERROR_FUNDS_ALREADY_RELEASED: felt252 = 'Funds already released';
+    const ERROR_MILESTONE_NOT_COMPLETED: felt252 = 'Milestone not completed';
+    const ERROR_UNAUTHORIZED_REQUESTER: felt252 = 'Only project owner can request';
 
     #[constructor]
     fn constructor(ref self: ContractState, admin: ContractAddress) {
@@ -193,6 +209,77 @@ pub mod Budget {
             10
         }
 
+        fn get_admin(self: @ContractState) -> ContractAddress {
+            self.admin.read()
+        }
+        fn get_fund_requests_counts(self: @ContractState, project_id: u64) -> u64 {
+            self.fund_requests_count.read(project_id)
+        }
+
+        fn set_fund_requests_counts(ref self: ContractState, project_id: u64, count: u64) {
+            self.fund_requests_count.write(project_id, count);
+        }
+
+        fn get_fund_requests_counter(self: @ContractState) -> u64 {
+            let request_id = self._fund_request_counter.read();
+            let increased_id = request_id + 1;
+            increased_id
+        }
+
+        fn set_fund_requests_counter(ref self: ContractState, value: u64) -> bool {
+            self._fund_request_counter.write(value);
+             true
+        }
+
+        fn check_owner(self: @ContractState, requester: ContractAddress, project_id: u64){
+            let project_owner = self.project_owners.read(project_id);
+                assert(project_owner == requester, ERROR_UNAUTHORIZED_REQUESTER);
+    
+        }
+        fn check_milestone(self: @ContractState, requester: ContractAddress, project_id: u64, milestone_id: u64)
+     {
+            let is_completed = self.milestone_statuses.read((project_id, milestone_id));
+            assert(is_completed, ERROR_MILESTONE_NOT_COMPLETED);
+    }
+    fn funds_released(self: @ContractState, project_id: u64, milestone_id: u64){
+        //check if funds already released
+        let funds_released = self.milestone_funds_released.read((project_id, milestone_id));
+        assert(!funds_released, ERROR_FUNDS_ALREADY_RELEASED);
+}
+    fn write_fund_request(ref self: ContractState, requester: ContractAddress, project_id: u64, milestone_id: u64, request_id: u64)-> bool{
+        // Store the funds request details
+        self.fund_request.write(request_id, (project_id, milestone_id, requester));
+
+        true
+    }
+
+fn request_funds(ref self: ContractState, requester: ContractAddress, project_id: u64, milestone_id: u64, request_id: u64) -> u64{
+            
+    self.check_owner(requester, project_id);
+    self.check_milestone(requester, project_id, milestone_id);
+    self.funds_released(project_id, milestone_id);
+
+    // 3. Create a new fund request
+    // Increment the fund request counter to generate a unique ID
+    self.write_fund_request(requester, project_id, milestone_id, request_id);
+    
+    let request_id = self.get_fund_requests_counter();
+    self.set_fund_requests_counter(request_id);
+
+
+
+    // Mark funds as requested (but not yet released)
+    self.milestone_funds_released.write((project_id, milestone_id), true);
+    
+    let funds_requested_event = FundsRequested{
+        project_id,
+        request_id,
+        milestone_id,
+    };
+    self.emit(Event::FundsRequested(funds_requested_event));
+    
+    request_id
+}
 
         // New function: Get all transactions for a specific project
         fn get_project_transactions(
@@ -266,10 +353,7 @@ pub mod Budget {
             fund_requests_to_return
         }
 
-        fn get_admin(self: @ContractState) -> ContractAddress {
-            self.admin.read()
-        }
-
+       
         fn set_fund_requests(ref self: ContractState, fund_request: FundRequest, budget_id: u64) {
             self.fund_requests.write((fund_request.project_id, budget_id), fund_request);
 
@@ -280,13 +364,13 @@ pub mod Budget {
             }
         }
 
-        fn get_fund_requests_counts(self: @ContractState, project_id: u64) -> u64 {
-            self.fund_requests_count.read(project_id)
-        }
+        // fn get_fund_requests_counts(self: @ContractState, project_id: u64) -> u64 {
+        //     self.fund_requests_count.read(project_id)
+        // }
 
-        fn set_fund_requests_counts(ref self: ContractState, project_id: u64, count: u64) {
-            self.fund_requests_count.write(project_id, count);
-        }
+        // fn set_fund_requests_counter(ref self: ContractState, project_id: u64, count: u64) {
+        //     self.fund_requests_count.write(project_id, count);
+        // }
 
 
         fn allocate_project_budget(
