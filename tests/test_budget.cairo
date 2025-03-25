@@ -344,7 +344,6 @@ fn test_allocate_project_budget_not_authorized() {
         );
 }
 
-
 #[test]
 fn test_get_project_budget() {
     // Initialize contract state
@@ -364,10 +363,10 @@ fn test_get_project_budget() {
         total_budget 
     };
     contract.projects.write(project_id, project);
-
+    
     // Fetch budget and verify correctness
     let retrieved_budget = contract.get_project_budget(project_id);
     assert_eq!(retrieved_budget, total_budget, "Budget retrieval failed");
-}
+}  
 
 
