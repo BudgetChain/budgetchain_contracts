@@ -28,7 +28,6 @@ pub mod Budget {
         transactions: LegacyMap<u64, Transaction>,
         project_count: u64,
         projects: Map<u64, Project>,
-        milestones: Map<(u64, u32), Milestone>,
         // We'll use this to keep track of all transaction IDs
         all_transaction_ids: LegacyMap<u64, u64>, // index -> transaction_id
         fund_requests: Map::<(u64, u64), FundRequest>, // Key: (project_id, request_id)
@@ -38,6 +37,8 @@ pub mod Budget {
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
         org_list: Array<Organization>,
+        milestones: Map<(u64, u32), Milestone>, // (project, milestone id) -> Milestone
+        org_milestones: Map<ContractAddress, u32> // org to number of milesones they have
     }
 
 
@@ -48,6 +49,7 @@ pub mod Budget {
         TransactionCreated: TransactionCreated,
         ProjectAllocated: ProjectAllocated,
         OrganizationAdded: OrganizationAdded,
+        MilestoneCreated: MilestoneCreated,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -82,6 +84,16 @@ pub mod Budget {
         pub id: u256,
         pub address: ContractAddress,
         pub name: felt252,
+    }
+
+
+    #[derive(Drop, starknet::Event)]
+    pub struct MilestoneCreated {
+        pub organization: u256,
+        pub project_id: u64,
+        pub milestone_description: felt252,
+        pub milestone_amount: u256,
+        pub created_at: u64,
     }
 
     // Error codes
@@ -316,10 +328,11 @@ pub mod Budget {
                     .entry((project_id, j))
                     .write(
                         Milestone {
+                            organization: org,
                             project_id: project_id,
-                            index: j,
-                            description: *milestone_descriptions.at(j),
-                            amount: *milestone_amounts.at(j),
+                            milestone_description: *milestone_descriptions.at(j),
+                            milestone_amount: *milestone_amounts.at(j),
+                            created_at: get_block_timestamp(),
                             completed: false,
                         },
                     );
@@ -366,9 +379,40 @@ pub mod Budget {
             org_id
         }
 
-        fn get_milestone(self: @ContractState, project_id: u64, index: u32) -> Milestone {
-            self.milestones.entry((project_id, index)).read()
+
+        fn create_milestone(
+            ref self: ContractState,
+            org: ContractAddress,
+            project_id: u64,
+            milestone_description: felt252,
+            milestone_amount: u256,
+        ) -> u32 {
+            let admin = self.admin.read();
+            assert(admin == get_caller_address(), ONLY_ADMIN);
+
+            let created_at = get_block_timestamp();
+
+            let new_milestone: Milestone = Milestone {
+                organization: org,
+                project_id: project_id,
+                milestone_description: milestone_description,
+                milestone_amount: milestone_amount,
+                created_at: created_at,
+                completed: false,
+            };
+            // // read the number of the curernt milestones the organization has
+            let current_milestone = self.org_milestones.read(org);
+
+            self.milestones.entry((project_id, current_milestone + 1)).write(new_milestone);
+            self.org_milestones.write(org, current_milestone + 1);
+
+            current_milestone + 1
         }
+
+        fn get_milestone(self: @ContractState, project_id: u64, milestone_id: u32) -> Milestone {
+            self.milestones.entry((project_id, milestone_id)).read()
+        }
+
 
         fn get_organization(self: @ContractState, org_id: u256) -> Organization {
             let organization = self.organizations.read(org_id);
