@@ -342,31 +342,32 @@ fn test_allocate_project_budget_not_authorized() {
         .allocate_project_budget(
             org_address, proj_owner, 100, array!['Milestone1', 'Milestone2'], array![90, 10],
         );
-
-        #[test]
-    fn test_get_project_budget() {
-        // Initialize contract state
-        let mut contract = Budget::default();
-        
-        // Define project details
-        let project_id: u64 = 1;
-        let org = ContractAddress::from(123);
-        let project_owner = ContractAddress::from(456);
-        let total_budget: u256 = 1_000_000.into();
-
-        // Add a project manually (mocking contract storage)
-        let project = Project { 
-            id: project_id, 
-            org, 
-            owner: project_owner, 
-            total_budget 
-        };
-        contract.projects.write(project_id, project);
-
-        // Fetch budget and verify correctness
-        let retrieved_budget = contract.get_project_budget(project_id);
-        assert_eq!(retrieved_budget, total_budget, "Budget retrieval failed");
-    }
-
 }
+
+
+#[test]
+fn test_get_project_budget() {
+    // Initialize contract state
+    let mut contract = Budget::default();
+    
+    // Define project details
+    let project_id: u64 = 1;
+    let org = ContractAddress::from(123);
+    let project_owner = ContractAddress::from(456);
+    let total_budget: u256 = 1_000_000.into();
+
+    // Add a project manually (mocking contract storage)
+    let project = Project { 
+        id: project_id, 
+        org, 
+        owner: project_owner, 
+        total_budget 
+    };
+    contract.projects.write(project_id, project);
+
+    // Fetch budget and verify correctness
+    let retrieved_budget = contract.get_project_budget(project_id);
+    assert_eq!(retrieved_budget, total_budget, "Budget retrieval failed");
+}
+
 
