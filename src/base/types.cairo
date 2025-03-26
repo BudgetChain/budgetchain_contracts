@@ -2,6 +2,16 @@ use starknet::ContractAddress;
 
 // STRUCTS
 #[derive(Copy, Drop, Serde, starknet::Store)]
+pub struct Organization {
+    pub id: u256,
+    pub address: ContractAddress,
+    pub name: felt252,
+    pub is_active: bool,
+    pub mission: felt252,
+    pub created_at: u64,
+}
+
+#[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct Project {
     pub organization: ContractAddress,
     pub total_budget: u256,
@@ -28,11 +38,15 @@ pub struct FundRequest {
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct Transaction {
+    pub id: u64,
     pub project_id: u64,
     pub transaction_type: felt252,
     pub amount: u256,
-    pub executor: ContractAddress,
     pub timestamp: u64,
+    pub sender: ContractAddress,
+    pub recipient: ContractAddress,
+    pub category: felt252,
+    pub description: felt252,
 }
 
 // ENUMS

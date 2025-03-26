@@ -1,22 +1,23 @@
 #[starknet::contract]
 pub mod Budget {
-    use starknet::storage::VecTrait;
-    use crate::interfaces::IBudget::IBudget;
-    use crate::base::errors::*;
-    use crate::base::types::{
-        FundRequest, FundRequestStatus, Project, Milestone, Transaction, ADMIN_ROLE,
-        ORGANIZATION_ROLE, TRANSACTION_FUND_RELEASE,
-    };
+    use core::array::Array;
+    use core::array::ArrayTrait;
+    use core::result::Result;
     use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
     use openzeppelin::introspection::src5::SRC5Component;
     use starknet::{
         ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
     };
     use starknet::storage::{
-        Map, MutableVecTrait, Vec, StoragePathEntry, StoragePointerReadAccess,
+        Map, MutableVecTrait, Vec, VecTrait, StoragePathEntry, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
-    use super::{};
+    use budgetchain_contracts::base::errors::*;
+    use budgetchain_contracts::base::types::{
+        FundRequest, FundRequestStatus, Project, Milestone, Organization, Transaction, ADMIN_ROLE,
+        ORGANIZATION_ROLE, TRANSACTION_FUND_RELEASE,
+    };
+    use budgetchain_contracts::interfaces::IBudget::IBudget;
 
     component!(path: AccessControlComponent, storage: accesscontrol, event: AccessControlEvent);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
@@ -34,26 +35,29 @@ pub mod Budget {
     #[storage]
     struct Storage {
         admin: ContractAddress,
-        organizations: Map<ContractAddress, bool>,
+        org_count: u256,
+        organizations: Map<u256, Organization>,
+        org_addresses: Map<ContractAddress, bool>,
+        org_list: Array<Organization>,
         projects: Map<u64, Project>,
         milestones: Map<u64, Map<u64, Milestone>>, // Key: (project_id, milestone_id)
         fund_requests: Map<u64, Map<u64, FundRequest>>, // Key: (project_id, request_id)
-        project_transaction_ids: Map<u64, Vec<u64>>,
         all_transactions: Vec<Transaction>,
-        transaction_counter: u64,
+        project_transaction_ids: Map<u64, Vec<u64>>,
+        transaction_count: u64,
+        transactions: Map<u64, Transaction>,
         #[substorage(v0)]
         accesscontrol: AccessControlComponent::Storage,
         #[substorage(v0)]
         src5: SRC5Component::Storage,
     }
 
-    /// Events
     #[event]
     #[derive(Drop, starknet::Event)]
-    pub enum Event {
-        AdminAdded: AdminAdded,
+    enum Event {
+        TransactionCreated: TransactionCreated,
         OrganizationAdded: OrganizationAdded,
-        OrganizationRemoved: OrganizationRemoved,
+        AdminAdded: AdminAdded,
         FundsReleased: FundsReleased,
         MilestoneCompleted: MilestoneCompleted,
         #[flat]
@@ -63,26 +67,34 @@ pub mod Budget {
     }
 
     #[derive(Drop, starknet::Event)]
+    struct TransactionCreated {
+        id: u256,
+        sender: ContractAddress,
+        recipient: ContractAddress,
+        amount: u128,
+        timestamp: u64,
+        category: felt252,
+        description: felt252,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct OrganizationAdded {
+        pub id: u256,
+        pub address: ContractAddress,
+        pub name: felt252,
+    }
+
+    #[derive(Drop, starknet::Event)]
     pub struct FundsReleased {
         pub project_id: u64,
         pub request_id: u64,
         pub milestone_id: u64,
-        pub amount: u256,
+        pub amount: u128,
     }
 
     #[derive(Drop, starknet::Event)]
     pub struct AdminAdded {
         pub new_admin: ContractAddress,
-    }
-
-    #[derive(Drop, starknet::Event)]
-    pub struct OrganizationAdded {
-        pub org: ContractAddress,
-    }
-
-    #[derive(Drop, starknet::Event)]
-    pub struct OrganizationRemoved {
-        pub org: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -102,12 +114,122 @@ pub mod Budget {
 
         // Initialize contract storage
         self.admin.write(default_admin);
-        self.transaction_counter.write(0);
+        self.transaction_count.write(0);
     }
 
     #[abi(embed_v0)]
     impl BudgetImpl of IBudget<ContractState> {
-        /// Allows authorized organizations to release funds for approved requests
+        fn create_transaction(
+            ref self: ContractState,
+            recipient: ContractAddress,
+            amount: u128,
+            category: felt252,
+            description: felt252,
+        ) -> Result<u64, felt252> {
+            // Simple implementation that just returns a dummy ID
+            Result::Ok(1)
+        }
+
+        // fn get_transaction(self: @ContractState, id: u64) -> Result<Transaction, felt252> {
+        //     // Simple implementation that returns a dummy transaction
+        //     let dummy_transaction = Transaction {
+        //         id: id,
+        //         sender: get_caller_address(),
+        //         recipient: get_caller_address(),
+        //         amount: 0,
+        //         timestamp: 0,
+        //         category: 'DUMMY',
+        //         description: 'Dummy transaction',
+        //     };
+
+        //     Result::Ok(dummy_transaction)
+        // }
+
+        fn get_transaction_history(
+            self: @ContractState, page: u64, page_size: u64,
+        ) -> Result<Array<Transaction>, felt252> {
+            // Validate page and page_size
+            if page == 0 {
+                return Result::Err(ERROR_INVALID_PAGE);
+            }
+
+            if page_size == 0 || page_size > 100 {
+                return Result::Err(ERROR_INVALID_PAGE_SIZE);
+            }
+
+            // Create array to hold dummy transaction data
+            let mut transactions_array = ArrayTrait::new();
+
+            // For demonstration, we'll create a few dummy transactions
+            let mut i: u64 = 0;
+            let transaction_count = if page_size < 5 {
+                page_size
+            } else {
+                5
+            };
+
+            while i < transaction_count {
+                let tx_id = (page - 1) * page_size + i + 1;
+
+                let dummy_tx = Transaction {
+                    id: tx_id,
+                    sender: get_caller_address(),
+                    recipient: get_caller_address(),
+                    amount: (tx_id * 100).into(),
+                    timestamp: 0,
+                    category: 'DUMMY',
+                    description: 'Dummy transaction',
+                };
+
+                transactions_array.append(dummy_tx);
+                i += 1;
+            };
+
+            Result::Ok(transactions_array)
+        }
+
+        fn create_organization(
+            ref self: ContractState, name: felt252, org_address: ContractAddress, mission: felt252,
+        ) -> u256 {
+            // Ensure only the admin can add an organization
+
+            let admin = self.admin.read();
+            assert(admin == get_caller_address(), ERROR_ONLY_ADMIN);
+
+            let created_at = get_block_timestamp();
+            // // Generate a unique organization ID
+            let org_id: u256 = self.org_count.read();
+
+            // Create and store the organization
+            let organization = Organization {
+                id: org_id,
+                address: org_address,
+                name,
+                is_active: true,
+                mission,
+                created_at: created_at,
+            };
+
+            // Emit an event
+            self.emit(OrganizationAdded { id: org_id, address: org_address, name: name });
+
+            self.org_count.write(org_id + 1);
+            self.organizations.write(org_id, organization);
+            self.org_addresses.write(org_address, true);
+
+            org_id
+        }
+
+        fn get_organization(self: @ContractState, org_id: u256) -> Organization {
+            let organization = self.organizations.read(org_id);
+            organization
+        }
+
+        fn get_admin(self: @ContractState) -> ContractAddress {
+            self.admin.read()
+        }
+
+    /// Allows authorized organizations to release funds for approved requests
         fn release_funds(
             ref self: ContractState, org: ContractAddress, project_id: u64, request_id: u64,
         ) {
@@ -152,14 +274,16 @@ pub mod Budget {
             self.projects.entry(project_id).write(updated_project);
 
             // Create Transaction record and add to tx history
-            let transaction_id = self.transaction_counter.read() + 1;
+            let transaction_id = self.transaction_count.read() + 1;
 
             let transaction = Transaction {
-                project_id,
-                transaction_type: TRANSACTION_FUND_RELEASE,
+                id: transaction_id,
+                sender: org,
+                recipient: request.requester,
                 amount: request.amount,
-                executor: org,
                 timestamp: get_block_timestamp(),
+                category: TRANSACTION_FUND_RELEASE,
+                description: milestone.milestone_description,
             };
 
             // Save transaction ID to project transaction IDs
@@ -169,7 +293,7 @@ pub mod Budget {
             self.all_transactions.append().write(transaction);
 
             // Update transaction counter
-            self.transaction_counter.write(transaction_id);
+            self.transaction_count.write(transaction_id);
 
             // Emit the FundsReleased event
             self
@@ -197,16 +321,17 @@ pub mod Budget {
 
         /// Transaction related getters
         fn get_transaction_count(self: @ContractState) -> u64 {
-            self.transaction_counter.read()
+            self.transaction_count.read()
         }
 
-        fn get_transaction(self: @ContractState, transaction_id: u64) -> Transaction {
+        fn get_transaction(self: @ContractState, id: u64) -> Result<Transaction, felt252> {
             assert(
-                transaction_id > 0 && transaction_id <= self.transaction_counter.read(),
+                id > 0 && id <= self.transaction_count.read(),
                 ERROR_INVALID_TRANSACTION_ID,
             );
+
             // Transaction IDs are 1-based, but array indices are 0-based
-            self.all_transactions.at(transaction_id - 1).read()
+            Result::Ok(self.all_transactions.at(id - 1).read())
         }
     }
 }
