@@ -135,7 +135,7 @@ mod tests {
                 assert(req.status == FundRequestStatus::Approved, 'Status mismatch');
             },
             Option::None => panic!("Missing second request"),
-        }
+        };
     }
 
     #[test]
@@ -261,7 +261,7 @@ mod tests {
 
         // Check updated budget
         let updated_budget = dispatcher.get_project_remaining_budget(project_id);
-        assert(updated_budget == 800, 'Budget should be 800 after return');
+        assert(updated_budget == 800, 'Invalid budget');
     }
 
     #[test]
