@@ -58,9 +58,9 @@ pub struct Milestone {
     pub released: bool,
 }
 
-// TRANSACTION CONSTANTS
-pub const TRANSACTION_FUND_RELEASE: felt252 = selector!("FUND_RELEASE");
-
 // ROLE CONSTANTS
 pub const ADMIN_ROLE: felt252 = selector!("ADMIN_ROLE");
 pub const ORGANIZATION_ROLE: felt252 = selector!("ORGANIZATION_ROLE");
+
+// TRANSACTION CATEGORY CONSTANTS
+pub const TRANSACTION_FUND_RELEASE: felt252 = selector!("FUND_RELEASE");

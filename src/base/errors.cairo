@@ -1,10 +1,9 @@
 // Access control errors
 pub const ERROR_ADMIN_REQUIRED: felt252 = 'Admin role required';
-pub const ERROR_CALLER_NOT_AUTHORIZED: felt252 = 'Caller not authorized';
 pub const ERROR_CALLER_NOT_ORG: felt252 = 'Caller must be organization';
 pub const ERROR_ONLY_ORGANIZATION: felt252 = 'Only organization can release';
 pub const ERROR_ONLY_ADMIN: felt252 = 'ONLY ADMIN';
-pub const ERROR_UNAUTHORIZED: felt252 = 'Not authorized';
+pub const ERROR_UNAUTHORIZED: felt252 = 'Caller not authorized';
 
 // Validation errors
 pub const ERROR_ARRAY_LENGTH_MISMATCH: felt252 = 'Array lengths mismatch';
