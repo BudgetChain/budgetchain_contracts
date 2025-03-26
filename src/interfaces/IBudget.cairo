@@ -1,5 +1,5 @@
 use starknet::ContractAddress;
-use crate::base::types::{Project, Milestone, FundRequest, Organization, Transaction};
+use budgetchain_contracts::base::types::{FundRequest, Project, Transaction, Organization, Milestone};
 
 #[starknet::interface]
 pub trait IBudget<TContractState> {
@@ -15,25 +15,48 @@ pub trait IBudget<TContractState> {
     fn get_transaction_history(
         self: @TContractState, page: u64, page_size: u64,
     ) -> Result<Array<Transaction>, felt252>;
-    fn get_transaction_count(self: @TContractState) -> u64;
-
+   fn get_transaction_count(self: @TContractState) -> u64;
+    
+    // Project Management
+    fn get_project(self: @TContractState, project_id: u64) -> Project;
+    fn get_project_remaining_budget(self: @TContractState, project_id: u64) -> u256;
+    fn get_project_transactions(
+        self: @TContractState, project_id: u64, page: u64, page_size: u64,
+    ) -> Result<(Array<Transaction>, u64), felt252>;
+    fn allocate_project_budget(
+        ref self: TContractState,
+        org: ContractAddress,
+        project_owner: ContractAddress,
+        total_budget: u256,
+        milestone_descriptions: Array<felt252>,
+        milestone_amounts: Array<u256>,
+    ) -> u64;
+    
     // Organization Management
     fn create_organization(
         ref self: TContractState, name: felt252, org_address: ContractAddress, mission: felt252,
     ) -> u256;
     fn get_organization(self: @TContractState, org_id: u256) -> Organization;
-
-    // Project Management
-    fn get_project(self: @TContractState, project_id: u64) -> Project;
-
-    // Milestone Management
-    fn get_milestone(self: @TContractState, project_id: u64, milestone_id: u64) -> Milestone;
-
+    
     // Fund Request Management
+    fn get_fund_requests(self: @TContractState, project_id: u64) -> Array<FundRequest>;
+    fn set_fund_requests(ref self: TContractState, fund_request: FundRequest, budget_id: u64);
+    fn get_fund_requests_counts(self: @TContractState, project_id: u64) -> u64;
+    fn set_fund_requests_counts(ref self: TContractState, project_id: u64, count: u64);
     /// Releases funds for an approved request
     fn release_funds(
         ref self: TContractState, org: ContractAddress, project_id: u64, request_id: u64,
     );
+
+    // Milestone Management
+    fn create_milestone(
+        ref self: TContractState,
+        org: ContractAddress,
+        project_id: u64,
+        milestone_description: felt252,
+        milestone_amount: u256,
+    ) -> u32;
+    fn get_milestone(self: @TContractState, project_id: u64, milestone_id: u32) -> Milestone;
 
     // Admin Management
     fn get_admin(self: @TContractState) -> ContractAddress;
