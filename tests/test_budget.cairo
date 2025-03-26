@@ -133,15 +133,32 @@ fn test_create_milestone_successfully() {
     let (contract_address, admin_address) = setup();
 
     let dispatcher = IBudgetDispatcher { contract_address };
-
+    let mut spy = spy_events();
     let name = 'John';
     let org_address = contract_address_const::<'Organization 1'>();
     let mission = 'Help the Poor';
 
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    let org0_id = dispatcher.create_organization(name, org_address, mission);
+    dispatcher.create_organization(name, org_address, mission);
     dispatcher.create_milestone(org_address, 12, 'Feed Dogs in Lekki', 2);
     stop_cheat_caller_address(admin_address);
+
+    spy
+    .assert_emitted(
+        @array![ // Ad. 2
+            (
+                contract_address,
+                    Budget::Budget::Event::MilestoneCreated(
+                        Budget::Budget::MilestoneCreated {
+                            organization: org_address,
+                            project_id: 12,
+                            milestone_description: 'Feed Dogs in Lekki',
+                            milestone_amount: 2,
+                        },
+                    ),
+            )
+        ]
+    );
 }
 
 
@@ -214,6 +231,83 @@ fn test_create_milestone_data_saved() {
     );
     assert(first_milestone.milestone_amount == milestone_amount, 'Org amount id didnt match');
 }
+
+#[test]
+fn test_create_milestone_completed_successfully() {
+    let (contract_address, admin_address) = setup();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let mut spy = spy_events(); 
+    let name = 'John';
+    let org_address = contract_address_const::<'Organization 1'>();
+    let mission = 'Help the Poor';
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_organization(name, org_address, mission);
+    let milestone_id = dispatcher.create_milestone(org_address, 12, 'Feed Dogs in Lekki', 2);
+    stop_cheat_caller_address(admin_address);
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    dispatcher.complete_milestone(org_address, 12, 1);
+    let milestone = dispatcher.get_milestone(12, milestone_id);
+    println!("milestone completed {} ", milestone.completed);
+    assert(milestone.completed == true, 'milestone not completed');
+
+    spy
+    .assert_emitted(
+        @array![
+            (
+                contract_address,
+                Budget::Budget::Event::MilestoneCompleted(
+                    Budget::Budget::MilestoneCompleted {
+                        milestone_id: milestone_id, org: org_address, project_id: 12,
+                    },
+                ),
+            ),
+        ],
+    );
+
+}
+
+#[test]
+#[should_panic(expected: 'Caller must be org')]
+fn test_create_milestone_completed_should_panic_if_not_called_by_org() {
+    let (contract_address, admin_address) = setup();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    let name = 'John';
+    let org_address = contract_address_const::<'Organization 1'>();
+    let mission = 'Help the Poor';
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let org0_id = dispatcher.create_organization(name, org_address, mission);
+    dispatcher.create_milestone(org_address, 12, 'Feed Dogs in Lekki', 2);
+    stop_cheat_caller_address(admin_address);
+    dispatcher.complete_milestone(org_address, 12, 1);
+}
+
+
+#[test]
+#[should_panic(expected: 'Caller must be org')]
+fn test_create_milestone_completed_should_panic_if_caller_not_org() {
+    let (contract_address, admin_address) = setup();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    let name = 'John';
+    let org_address = contract_address_const::<'Organization 1'>();
+    let random = contract_address_const::<'Random'>();
+    let mission = 'Help the Poor';
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_organization(name, org_address, mission);
+    dispatcher.create_milestone(org_address, 12, 'Feed Dogs in Lekki', 2);
+    stop_cheat_caller_address(admin_address);
+
+    cheat_caller_address(contract_address, random, CheatSpan::Indefinite);
+    dispatcher.complete_milestone(org_address, 12, 1);
+}
+
 fn test_allocate_project_budget_success() {
     let (contract_address, admin_address) = setup();
 

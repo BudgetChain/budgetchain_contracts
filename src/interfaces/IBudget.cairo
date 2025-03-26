@@ -58,6 +58,9 @@ pub trait IBudget<TContractState> {
         milestone_description: felt252,
         milestone_amount: u256,
     ) -> u32;
+    fn complete_milestone(
+        ref self: TContractState, org: ContractAddress, project_id: u64, milestone_id: u32,
+    );
 
     fn get_milestone(self: @TContractState, project_id: u64, milestone_id: u32) -> Milestone;
 }

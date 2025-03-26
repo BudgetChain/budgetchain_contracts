@@ -50,6 +50,7 @@ pub mod Budget {
         ProjectAllocated: ProjectAllocated,
         OrganizationAdded: OrganizationAdded,
         MilestoneCreated: MilestoneCreated,
+        MilestoneCompleted: MilestoneCompleted,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -57,6 +58,13 @@ pub mod Budget {
         project_id: u64,
         request_id: u64,
         amount: u128,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct MilestoneCompleted {
+        pub milestone_id: u32,
+        pub org: ContractAddress,
+        pub project_id: u64,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -89,11 +97,10 @@ pub mod Budget {
 
     #[derive(Drop, starknet::Event)]
     pub struct MilestoneCreated {
-        pub organization: u256,
+        pub organization: ContractAddress,
         pub project_id: u64,
         pub milestone_description: felt252,
         pub milestone_amount: u256,
-        pub created_at: u64,
     }
 
     // Error codes
@@ -102,6 +109,7 @@ pub mod Budget {
     const ERROR_INVALID_PAGE_SIZE: felt252 = 'Invalid page size';
     const ERROR_NO_TRANSACTIONS: felt252 = 'No transactions found';
     const UNAUTHORIZED: felt252 = 'Not authorized';
+    const ALREADY_COMPLETED: felt252 = 'Milestone Already Completed';
     const CALLER_NOT_ORG: felt252 = 'Caller must be org';
     const BUDGET_MISMATCH: felt252 = 'Milestone sum != total budget';
     const ARRAY_LENGTH_MISMATCH: felt252 = 'Array lengths mismatch';
@@ -406,7 +414,39 @@ pub mod Budget {
             self.milestones.entry((project_id, current_milestone + 1)).write(new_milestone);
             self.org_milestones.write(org, current_milestone + 1);
 
+            self
+                .emit(
+                    MilestoneCreated {
+                        organization: org,
+                        project_id: project_id,
+                        milestone_description: milestone_description,
+                        milestone_amount: milestone_amount,
+                    },
+                );
+
             current_milestone + 1
+        }
+
+        fn complete_milestone(
+            ref self: ContractState, org: ContractAddress, project_id: u64, milestone_id: u32,
+        ) {
+            let caller = get_caller_address();
+            assert(self.org_addresses.entry(org).read(), UNAUTHORIZED);
+            assert(caller == org, CALLER_NOT_ORG);
+
+            let mut milestone: Milestone = self.milestones.entry((project_id, milestone_id)).read();
+            assert(milestone.completed == false, ALREADY_COMPLETED);
+
+            milestone.completed = true;
+
+            self.milestones.entry((project_id, milestone_id)).write(milestone);
+
+            self
+                .emit(
+                    MilestoneCompleted {
+                        milestone_id: milestone_id, org: org, project_id: project_id,
+                    },
+                );
         }
 
         fn get_milestone(self: @ContractState, project_id: u64, milestone_id: u32) -> Milestone {
