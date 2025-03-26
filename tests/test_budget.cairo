@@ -144,10 +144,10 @@ fn test_create_milestone_successfully() {
     stop_cheat_caller_address(admin_address);
 
     spy
-    .assert_emitted(
-        @array![ // Ad. 2
-            (
-                contract_address,
+        .assert_emitted(
+            @array![ // Ad. 2
+                (
+                    contract_address,
                     Budget::Budget::Event::MilestoneCreated(
                         Budget::Budget::MilestoneCreated {
                             organization: org_address,
@@ -156,9 +156,9 @@ fn test_create_milestone_successfully() {
                             milestone_amount: 2,
                         },
                     ),
-            )
-        ]
-    );
+                ),
+            ],
+        );
 }
 
 
@@ -237,7 +237,7 @@ fn test_create_milestone_completed_successfully() {
     let (contract_address, admin_address) = setup();
 
     let dispatcher = IBudgetDispatcher { contract_address };
-    let mut spy = spy_events(); 
+    let mut spy = spy_events();
     let name = 'John';
     let org_address = contract_address_const::<'Organization 1'>();
     let mission = 'Help the Poor';
@@ -253,19 +253,18 @@ fn test_create_milestone_completed_successfully() {
     assert(milestone.completed == true, 'milestone not completed');
 
     spy
-    .assert_emitted(
-        @array![
-            (
-                contract_address,
-                Budget::Budget::Event::MilestoneCompleted(
-                    Budget::Budget::MilestoneCompleted {
-                        milestone_id: milestone_id, org: org_address, project_id: 12,
-                    },
+        .assert_emitted(
+            @array![
+                (
+                    contract_address,
+                    Budget::Budget::Event::MilestoneCompleted(
+                        Budget::Budget::MilestoneCompleted {
+                            milestone_id: milestone_id, org: org_address, project_id: 12,
+                        },
+                    ),
                 ),
-            ),
-        ],
-    );
-
+            ],
+        );
 }
 
 #[test]
