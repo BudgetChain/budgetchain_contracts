@@ -196,7 +196,10 @@ fn test_successful_fund_release_event() {
                     contract_address,
                     Budget::Event::FundsReleased(
                         Budget::FundsReleased {
-                            project_id, request_id, milestone_id, amount: amount.try_into().unwrap(),
+                            project_id,
+                            request_id,
+                            milestone_id,
+                            amount: amount.try_into().unwrap(),
                         },
                     ),
                 ),
