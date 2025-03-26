@@ -60,5 +60,8 @@ pub trait IBudget<TContractState> {
     ) -> u32;
 
     fn get_milestone(self: @TContractState, project_id: u64, milestone_id: u32) -> Milestone;
+
+    // Project Budget Retrieval
+    fn get_project_budget(self: @TContractState, project_id: u64) -> u256;
 }
 
