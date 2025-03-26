@@ -10,7 +10,6 @@ mod tests {
         stop_cheat_caller_address, declare,
     };
 
-
     fn setup() -> (ContractAddress, ContractAddress) {
         let admin_address: ContractAddress = contract_address_const::<'admin'>();
 
@@ -98,11 +97,19 @@ mod tests {
 
         // Create test fund requests
         let fund_request1 = FundRequest {
-            project_id: 1, amount: 1000, requester, status: FundRequestStatus::Pending,
+            project_id: 1,
+            milestone_id: 1,
+            amount: 1000,
+            requester,
+            status: FundRequestStatus::Pending,
         };
 
         let fund_request2 = FundRequest {
-            project_id: 1, amount: 2000, requester, status: FundRequestStatus::Approved,
+            project_id: 1,
+            milestone_id: 1,
+            amount: 2000,
+            requester,
+            status: FundRequestStatus::Approved,
         };
 
         // Create a fund request
@@ -156,6 +163,7 @@ mod tests {
         while request_id < 5_u64 {
             let request = FundRequest {
                 project_id,
+                milestone_id: 1,
                 amount: (request_id * 1000_u64).into(),
                 requester,
                 status: FundRequestStatus::Pending,
@@ -214,4 +222,3 @@ mod tests {
         assert(remaining_budget == 100, 'incorrect remaining budget');
     }
 }
-

@@ -6,7 +6,6 @@ use snforge_std::{
 };
 use starknet::{ContractAddress, contract_address_const};
 
-
 fn setup() -> (ContractAddress, ContractAddress) {
     let admin_address: ContractAddress = contract_address_const::<'admin'>();
 
@@ -144,7 +143,6 @@ fn test_create_milestone_successfully() {
     stop_cheat_caller_address(admin_address);
 }
 
-
 #[test]
 fn test_create_multiple_milestone_successfully() {
     let (contract_address, admin_address) = setup();
@@ -183,7 +181,6 @@ fn test_create_milestone_should_panic_if_not_organization() {
 
     assert(org0_id == 0, '1st Org ID is 0');
 }
-
 
 #[test]
 fn test_create_milestone_data_saved() {
@@ -259,7 +256,7 @@ fn test_allocate_project_budget_success() {
 }
 
 #[test]
-#[should_panic(expected: 'Caller must be org')]
+#[should_panic(expected: 'Caller must be organization')]
 fn test_allocate_project_budget_not_org() {
     let (contract_address, admin_address) = setup();
 
@@ -329,7 +326,7 @@ fn test_allocate_project_budget_array_mismatch() {
 }
 
 #[test]
-#[should_panic(expected: 'Not authorized')]
+#[should_panic(expected: 'Caller not authorized')]
 fn test_allocate_project_budget_not_authorized() {
     let (contract_address, _) = setup();
 
@@ -343,4 +340,3 @@ fn test_allocate_project_budget_not_authorized() {
             org_address, proj_owner, 100, array!['Milestone1', 'Milestone2'], array![90, 10],
         );
 }
-

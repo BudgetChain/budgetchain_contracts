@@ -1,5 +1,6 @@
 // Make modules public so they can be accessed
 pub mod base {
+    pub mod errors;
     pub mod types;
 }
 

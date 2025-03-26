@@ -3,6 +3,7 @@ use starknet::ContractAddress;
 #[derive(Drop, Copy, Serde, PartialEq, starknet::Store)]
 pub struct FundRequest {
     pub project_id: u64,
+    pub milestone_id: u64,
     pub amount: u128,
     pub requester: ContractAddress,
     pub status: FundRequestStatus,
@@ -19,7 +20,7 @@ pub enum FundRequestStatus {
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct Transaction {
     pub id: u64,
-    pub project_id: u64, // Add this field
+    pub project_id: u64,
     pub sender: ContractAddress,
     pub recipient: ContractAddress,
     pub amount: u128,
@@ -54,4 +55,12 @@ pub struct Milestone {
     pub milestone_amount: u256,
     pub created_at: u64,
     pub completed: bool,
+    pub released: bool,
 }
+
+// ROLE CONSTANTS
+pub const ADMIN_ROLE: felt252 = selector!("ADMIN_ROLE");
+pub const ORGANIZATION_ROLE: felt252 = selector!("ORGANIZATION_ROLE");
+
+// TRANSACTION CATEGORY CONSTANTS
+pub const TRANSACTION_FUND_RELEASE: felt252 = selector!("FUND_RELEASE");
