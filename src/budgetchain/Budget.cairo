@@ -140,19 +140,7 @@ pub mod Budget {
         pub created_at: u64,
     }
 
-    // Error codes
-    const ERROR_INVALID_TRANSACTION_ID: felt252 = 'Invalid transaction ID';
-    const ERROR_INVALID_PAGE: felt252 = 'Invalid page number';
-    const ERROR_INVALID_PAGE_SIZE: felt252 = 'Invalid page size';
-    const ERROR_NO_TRANSACTIONS: felt252 = 'No transactions found';
-    const UNAUTHORIZED: felt252 = 'Not authorized';
-    const CALLER_NOT_ORG: felt252 = 'Caller must be org';
-    const BUDGET_MISMATCH: felt252 = 'Milestone sum != total budget';
-    const ARRAY_LENGTH_MISMATCH: felt252 = 'Array lengths mismatch';
-    const ONLY_ADMIN: felt252 = 'ONLY ADMIN';
-    const ERROR_FUNDS_ALREADY_RELEASED: felt252 = 'Funds already released';
-    const ERROR_MILESTONE_NOT_COMPLETED: felt252 = 'Milestone not completed';
-    const ERROR_UNAUTHORIZED_REQUESTER: felt252 = 'Only project owner can request';
+
     #[derive(Drop, starknet::Event)]
     pub struct AdminAdded {
         pub new_admin: ContractAddress,
@@ -518,10 +506,6 @@ pub mod Budget {
 
             current_milestone + 1
         }
-
-        // fn get_milestone(self: @ContractState, project_id: u64, milestone_id: u64) -> Milestone {
-        //     self.milestones.read((project_id, milestone_id))
-        // }
 
         fn get_organization(self: @ContractState, org_id: u256) -> Organization {
             let organization = self.organizations.read(org_id);
