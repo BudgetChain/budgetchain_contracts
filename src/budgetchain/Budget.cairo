@@ -10,7 +10,6 @@ pub mod Budget {
     use core::array::{Array, ArrayTrait};
     use core::option::Option;
     use core::result::Result;
-    use budgetchain_contracts::base::types::{Organization, Transaction, Project, Milestone};
     use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
     use openzeppelin::introspection::src5::SRC5Component;
     use starknet::storage::{
@@ -20,11 +19,6 @@ pub mod Budget {
     use starknet::{
         ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
     };
-    use budgetchain_contracts::base::errors::*;
-    use budgetchain_contracts::base::types::{
-        FundRequest, FundRequestStatus, ADMIN_ROLE, ORGANIZATION_ROLE, TRANSACTION_FUND_RELEASE,
-    };
-    use budgetchain_contracts::interfaces::IBudget::IBudget;
     component!(path: AccessControlComponent, storage: accesscontrol, event: AccessControlEvent);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
 
@@ -730,7 +724,7 @@ pub mod Budget {
             request_id
         }
 
-          fn get_project_budget(self: @ContractState, project_id: u64) -> u256 {
+        fn get_project_budget(self: @ContractState, project_id: u64) -> u256 {
             let project = self.projects.read(project_id);
             project.total_budget
         }
