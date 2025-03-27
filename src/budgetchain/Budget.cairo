@@ -640,5 +640,11 @@ pub mod Budget {
                     ),
                 );
         }
+
+          fn get_project_budget(self: @ContractState, project_id: u64) -> u256 {
+            let project = self.projects.read(project_id);
+            project.total_budget
+        }
+
     }
 }

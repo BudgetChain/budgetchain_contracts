@@ -221,4 +221,21 @@ mod tests {
         let remaining_budget = dispatcher.get_project_remaining_budget(project_id);
         assert(remaining_budget == 100, 'incorrect remaining budget');
     }
+
+
+    #[test]
+    fn test_get_project_budget() {
+        let mut starknet = Starknet::new();
+        
+        let contract = starknet.deploy("budget_contract.sierra");
+        
+        let project_id: u64 = 1;
+        
+        let initial_budget: u256 = 1000.into();
+        let _ = contract.call("allocate_budget", (project_id, initial_budget));
+        
+        let result: CallResult<u256> = contract.call("get_project_budget", (project_id,));
+        
+        assert_eq!(result.unwrap(), initial_budget);
+        }
 }

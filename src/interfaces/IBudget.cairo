@@ -65,4 +65,7 @@ pub trait IBudget<TContractState> {
 
     // Admin Management
     fn get_admin(self: @TContractState) -> ContractAddress;
+
+    // Buget interface
+     fn get_project_budget(self: @TContractState, project_id: u64) -> u256;
 }
