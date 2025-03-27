@@ -1,26 +1,27 @@
+#[feature("deprecated_legacy_map")]
 #[starknet::contract]
 pub mod Budget {
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess, StoragePathEntry,
+    };
+    use starknet::storage::{MutableVecTrait, Vec, VecTrait};
     use core::array::Array;
 
     use core::array::ArrayTrait;
     use core::option::Option;
     use core::result::Result;
+    use budgetchain_contracts::base::types::{Organization, Transaction, Project, Milestone};
     use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
     use openzeppelin::introspection::src5::SRC5Component;
     use starknet::{
         ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
     };
-    use starknet::storage::{
-        Map, MutableVecTrait, Vec, VecTrait, StoragePathEntry, StorageMapReadAccess,
-        StorageMapWriteAccess, StoragePointerReadAccess, StoragePointerWriteAccess,
-    };
     use budgetchain_contracts::base::errors::*;
     use budgetchain_contracts::base::types::{
-        FundRequest, FundRequestStatus, Project, Milestone, Organization, Transaction, ADMIN_ROLE,
-        ORGANIZATION_ROLE, TRANSACTION_FUND_RELEASE,
+        FundRequest, FundRequestStatus, ADMIN_ROLE, ORGANIZATION_ROLE, TRANSACTION_FUND_RELEASE,
     };
     use budgetchain_contracts::interfaces::IBudget::IBudget;
-
     component!(path: AccessControlComponent, storage: accesscontrol, event: AccessControlEvent);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
 
@@ -33,6 +34,7 @@ pub mod Budget {
     // SRC5 Mixin
     #[abi(embed_v0)]
     impl SRC5Impl = SRC5Component::SRC5Impl<ContractState>;
+
 
     #[storage]
     struct Storage {
@@ -58,7 +60,13 @@ pub mod Budget {
         accesscontrol: AccessControlComponent::Storage,
         #[substorage(v0)]
         src5: SRC5Component::Storage,
+        fund_request: Map<u64, (u64, u64, ContractAddress)>,
+        _fund_request_counter: u64,
+        milestone_funds_released: LegacyMap<(u64, u64), bool>,
+        project_owners: LegacyMap<u64, ContractAddress>,
+        milestone_statuses: LegacyMap<(u64, u64), bool>,
     }
+
 
     #[event]
     #[derive(Drop, starknet::Event)]
@@ -74,6 +82,7 @@ pub mod Budget {
         AccessControlEvent: AccessControlComponent::Event,
         #[flat]
         SRC5Event: SRC5Component::Event,
+        FundsRequested: FundsRequested,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -95,6 +104,7 @@ pub mod Budget {
         description: felt252,
     }
 
+
     #[derive(Drop, starknet::Event)]
     pub struct ProjectAllocated {
         pub project_id: u64,
@@ -111,6 +121,13 @@ pub mod Budget {
     }
 
     #[derive(Drop, starknet::Event)]
+    struct FundsRequested {
+        project_id: u64,
+        request_id: u64,
+        milestone_id: u64,
+    }
+
+    #[derive(Drop, starknet::Event)]
     pub struct MilestoneCreated {
         pub organization: u256,
         pub project_id: u64,
@@ -118,6 +135,7 @@ pub mod Budget {
         pub milestone_amount: u256,
         pub created_at: u64,
     }
+
 
     #[derive(Drop, starknet::Event)]
     pub struct AdminAdded {
@@ -439,6 +457,9 @@ pub mod Budget {
                 created_at: created_at,
             };
 
+            // Emit an event
+            self.emit(OrganizationAdded { id: org_id, address: org_address, name: name });
+
             self.org_count.write(org_id + 1);
             self.organizations.write(org_id, organization);
             self.org_addresses.write(org_address, true);
@@ -480,10 +501,6 @@ pub mod Budget {
             self.org_milestones.write(org, current_milestone + 1);
 
             current_milestone + 1
-        }
-
-        fn get_milestone(self: @ContractState, project_id: u64, milestone_id: u64) -> Milestone {
-            self.milestones.read((project_id, milestone_id))
         }
 
         fn get_organization(self: @ContractState, org_id: u256) -> Organization {
@@ -639,6 +656,75 @@ pub mod Budget {
                         },
                     ),
                 );
+        }
+
+
+        fn get_fund_requests_counter(self: @ContractState) -> u64 {
+            let request_id = self._fund_request_counter.read();
+            let increased_id = request_id + 1;
+            increased_id
+        }
+
+        fn set_fund_requests_counter(ref self: ContractState, value: u64) -> bool {
+            self._fund_request_counter.write(value);
+            true
+        }
+
+        fn check_owner(self: @ContractState, requester: ContractAddress, project_id: u64) {
+            let project_owner = self.project_owners.read(project_id);
+            assert(project_owner == requester, ERROR_UNAUTHORIZED_REQUESTER);
+        }
+        fn check_milestone(
+            self: @ContractState, requester: ContractAddress, project_id: u64, milestone_id: u64,
+        ) {
+            let is_completed = self.milestone_statuses.read((project_id, milestone_id));
+            assert(is_completed, ERROR_MILESTONE_NOT_COMPLETED);
+        }
+        fn funds_released(self: @ContractState, project_id: u64, milestone_id: u64) {
+            //check if funds already released
+            let funds_released = self.milestone_funds_released.read((project_id, milestone_id));
+            assert(!funds_released, ERROR_FUNDS_ALREADY_RELEASED);
+        }
+        fn write_fund_request(
+            ref self: ContractState,
+            requester: ContractAddress,
+            project_id: u64,
+            milestone_id: u64,
+            request_id: u64,
+        ) -> bool {
+            // Store the funds request details
+            self.fund_request.write(request_id, (project_id, milestone_id, requester));
+
+            true
+        }
+        fn get_milestone(self: @ContractState, project_id: u64, milestone_id: u64) -> Milestone {
+            self.milestones.read((project_id, milestone_id))
+        }
+        fn request_funds(
+            ref self: ContractState,
+            requester: ContractAddress,
+            project_id: u64,
+            milestone_id: u64,
+            request_id: u64,
+        ) -> u64 {
+            self.check_owner(requester, project_id);
+            self.check_milestone(requester, project_id, milestone_id);
+            self.funds_released(project_id, milestone_id);
+
+            // 3. Create a new fund request
+            // Increment the fund request counter to generate a unique ID
+            self.write_fund_request(requester, project_id, milestone_id, request_id);
+
+            let request_id = self.get_fund_requests_counter();
+            self.set_fund_requests_counter(request_id);
+
+            // Mark funds as requested (but not yet released)
+            self.milestone_funds_released.write((project_id, milestone_id), true);
+
+            let funds_requested_event = FundsRequested { project_id, request_id, milestone_id };
+            self.emit(Event::FundsRequested(funds_requested_event));
+
+            request_id
         }
 
           fn get_project_budget(self: @ContractState, project_id: u64) -> u256 {

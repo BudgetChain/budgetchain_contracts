@@ -222,6 +222,80 @@ mod tests {
         assert(remaining_budget == 100, 'incorrect remaining budget');
     }
 
+    #[test]
+    fn test_fund_request_counter() {
+        let (contract_address, admin_address) = setup();
+        let caller = contract_address_const::<'address'>();
+        start_cheat_caller_address(contract_address, caller);
+        let dispatcher = IBudgetDispatcher { contract_address };
+        let counter_before = dispatcher.get_fund_requests_counter();
+        assert_eq!(counter_before, 1);
+        //Ensure dispatcher method exist
+        let dispatch_result = dispatcher.write_fund_request(caller, 10, 10, 10);
+        assert_eq!(dispatch_result, true);
+    }
+
+    #[test]
+    fn test_write_fund_request() {
+        let (contract_address, admin_address) = setup();
+        let caller = contract_address_const::<'address'>();
+        start_cheat_caller_address(contract_address, caller);
+        let dispatcher = IBudgetDispatcher { contract_address };
+
+        //Ensure dispatcher method exist
+        let dispatch_result = dispatcher.write_fund_request(caller, 10, 10, 10);
+        assert_eq!(dispatch_result, true);
+    }
+
+    #[test]
+    #[should_panic(expected: 'Milestone not completed')]
+    fn test__milestone_completed() {
+        let (contract_address, admin_address) = setup();
+        let caller = contract_address_const::<'address'>();
+        start_cheat_caller_address(contract_address, caller);
+        let dispatcher = IBudgetDispatcher { contract_address };
+
+        dispatcher.check_milestone(caller, 20, 30);
+    }
+
+    #[test]
+    #[should_panic(expected: 'Only project owner can request')]
+    fn test__unauthorized_collection() {
+        let (contract_address, admin_address) = setup();
+        let caller = contract_address_const::<'address'>();
+        start_cheat_caller_address(contract_address, caller);
+        let dispatcher = IBudgetDispatcher { contract_address };
+
+        dispatcher.check_owner(caller, 20);
+    }
+
+    #[test]
+    fn test_state_change() {
+        let (contract_address, admin_address) = setup();
+        let dispatcher = IBudgetDispatcher { contract_address };
+
+        let set_fund_request = dispatcher.set_fund_requests_counter(20);
+        assert_eq!(set_fund_request, true);
+    }
+
+    #[test]
+    fn test_data() {
+        let (contract_address, admin_address) = setup();
+        let dispatcher = IBudgetDispatcher { contract_address };
+
+        // Ensure dispatcher methods exist
+        let admin = dispatcher.get_admin();
+
+        assert(admin == admin_address, 'incorrect admin');
+
+        //Ensure dispatcher method exist
+        let get_transaction_count = dispatcher.get_transaction_count();
+        assert_eq!(get_transaction_count, 0);
+
+        let get_fund_request_counter = dispatcher.get_fund_requests_counter();
+        assert_eq!(get_fund_request_counter, 1);
+    }
+
 
     #[test]
     fn test_get_project_budget() {

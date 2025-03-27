@@ -65,6 +65,27 @@ pub trait IBudget<TContractState> {
 
     // Admin Management
     fn get_admin(self: @TContractState) -> ContractAddress;
+    fn request_funds(
+        ref self: TContractState,
+        requester: ContractAddress,
+        project_id: u64,
+        milestone_id: u64,
+        request_id: u64,
+    ) -> u64;
+    fn write_fund_request(
+        ref self: TContractState,
+        requester: ContractAddress,
+        project_id: u64,
+        milestone_id: u64,
+        request_id: u64,
+    ) -> bool;
+    fn funds_released(self: @TContractState, project_id: u64, milestone_id: u64);
+    fn check_milestone(
+        self: @TContractState, requester: ContractAddress, project_id: u64, milestone_id: u64,
+    );
+    fn check_owner(self: @TContractState, requester: ContractAddress, project_id: u64);
+    fn set_fund_requests_counter(ref self: TContractState, value: u64) -> bool;
+    fn get_fund_requests_counter(self: @TContractState) -> u64;
 
     // Buget interface
      fn get_project_budget(self: @TContractState, project_id: u64) -> u256;
