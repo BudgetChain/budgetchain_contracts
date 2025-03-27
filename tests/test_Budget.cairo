@@ -1,14 +1,13 @@
 #[cfg(test)]
 mod tests {
-    use budgetchain_contracts::base::types::Transaction;
-    use core::array::ArrayTrait;
-    use budgetchain_contracts::base::types::{FundRequest, FundRequestStatus};
-    use starknet::{ContractAddress, contract_address_const};
+    use budgetchain_contracts::base::types::{FundRequest, FundRequestStatus, Transaction};
     use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
+    use core::array::ArrayTrait;
     use snforge_std::{
-        ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-        stop_cheat_caller_address, declare,
+        ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
+        stop_cheat_caller_address,
     };
+    use starknet::{ContractAddress, contract_address_const};
 
     fn setup() -> (ContractAddress, ContractAddress) {
         let admin_address: ContractAddress = contract_address_const::<'admin'>();
@@ -170,7 +169,7 @@ mod tests {
             };
             dispatcher.set_fund_requests(request, request_id);
             request_id += 1_u64;
-        };
+        }
 
         // Verify count
         let count = dispatcher.get_fund_requests_counts(project_id); // 0_u64 is dummy
@@ -300,16 +299,16 @@ mod tests {
     #[test]
     fn test_get_project_budget() {
         let mut starknet = Starknet::new();
-        
+
         let contract = starknet.deploy("budget_contract.sierra");
-        
+
         let project_id: u64 = 1;
-        
+
         let initial_budget: u256 = 1000.into();
         let _ = contract.call("allocate_budget", (project_id, initial_budget));
-        
+
         let result: CallResult<u256> = contract.call("get_project_budget", (project_id,));
-        
+
         assert_eq!(result.unwrap(), initial_budget);
-        }
+    }
 }

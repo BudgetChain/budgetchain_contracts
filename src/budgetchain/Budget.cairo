@@ -1,19 +1,22 @@
 #[feature("deprecated_legacy_map")]
 #[starknet::contract]
 pub mod Budget {
-    use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess, StoragePathEntry,
+    use budgetchain_contracts::base::errors::*;
+    use budgetchain_contracts::base::types::{
+        ADMIN_ROLE, FundRequest, FundRequestStatus, Milestone, ORGANIZATION_ROLE, Organization,
+        Project, TRANSACTION_FUND_RELEASE, Transaction,
     };
-    use starknet::storage::{MutableVecTrait, Vec, VecTrait};
-    use core::array::Array;
-
-    use core::array::ArrayTrait;
+    use budgetchain_contracts::interfaces::IBudget::IBudget;
+    use core::array::{Array, ArrayTrait};
     use core::option::Option;
     use core::result::Result;
     use budgetchain_contracts::base::types::{Organization, Transaction, Project, Milestone};
     use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
     use openzeppelin::introspection::src5::SRC5Component;
+    use starknet::storage::{
+        Map, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
+        StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
+    };
     use starknet::{
         ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
     };
@@ -45,9 +48,9 @@ pub mod Budget {
         project_count: u64,
         projects: Map<u64, Project>,
         all_transaction_ids: Map<u64, u64>, // index -> transaction_id
-        fund_requests: Map::<(u64, u64), FundRequest>, // Key: (project_id, request_id)
-        fund_requests_count: Map::<u64, u64>, // Key: project_id, Value: count of requests
-        project_budgets: Map::<u64, u128>, // Key: project_id, Value: remaining budget
+        fund_requests: Map<(u64, u64), FundRequest>, // Key: (project_id, request_id)
+        fund_requests_count: Map<u64, u64>, // Key: project_id, Value: count of requests
+        project_budgets: Map<u64, u128>, // Key: project_id, Value: remaining budget
         org_count: u256,
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
@@ -278,7 +281,7 @@ pub mod Budget {
 
                 transactions_array.append(dummy_tx);
                 i += 1;
-            };
+            }
 
             Result::Ok(transactions_array)
         }
@@ -306,7 +309,7 @@ pub mod Budget {
                     transactions_array.append(transaction);
                 }
                 i += 1;
-            };
+            }
 
             if transactions_array.len() == 0 {
                 return Result::Err(ERROR_NO_TRANSACTIONS);
@@ -329,7 +332,7 @@ pub mod Budget {
                     paginated_transactions.append(transaction);
                 }
                 j += 1;
-            };
+            }
 
             Result::Ok((paginated_transactions, total_transactions.into()))
         }
@@ -349,7 +352,7 @@ pub mod Budget {
                 let fund_request = self.fund_requests.read((project_id, current_index));
                 fund_requests_to_return.append(fund_request);
                 current_index += 1;
-            };
+            }
 
             fund_requests_to_return
         }
@@ -397,7 +400,7 @@ pub mod Budget {
             while i < milestone_count {
                 sum += *milestone_amounts.at(i.into());
                 i += 1;
-            };
+            }
             assert(sum == total_budget, ERROR_BUDGET_MISMATCH);
 
             let project_id = self.project_count.read();
@@ -425,7 +428,7 @@ pub mod Budget {
                         },
                     );
                 j += 1;
-            };
+            }
 
             self.project_count.write(project_id + 1);
             self.org_milestones.write(org, milestone_count.try_into().unwrap());
@@ -731,6 +734,5 @@ pub mod Budget {
             let project = self.projects.read(project_id);
             project.total_budget
         }
-
     }
 }
