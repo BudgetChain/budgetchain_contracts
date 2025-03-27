@@ -27,7 +27,63 @@ mod tests {
         (contract_address, admin_address)
     }
 
+    // Main test functions that will be discovered by snforge
+    
     #[test]
+    fn run_test_initial_data() {
+        test_initial_data();
+    }
+
+    #[test]
+    fn run_test_transaction_struct() {
+        test_transaction_struct();
+    }
+
+    #[test]
+    fn run_test_pagination_validation() {
+        test_pagination_validation();
+    }
+
+    #[test]
+    fn run_test_all_get_fund_requests() {
+        test_all_get_fund_requests();
+    }
+
+    #[test]
+    #[should_panic]
+    fn run_test_get_fund_requests_empty() {
+        test_get_fund_requests_empty();
+    }
+
+    #[test]
+    fn run_test_get_fund_requests_after_multiple_additions() {
+        test_get_fund_requests_after_multiple_additions();
+    }
+
+    #[test]
+    fn run_should_get_project_remaining_budget() {
+        should_get_project_remaining_budget();
+    }
+
+    #[test]
+    fn run_test_return_funds_success() {
+        test_return_funds_success();
+    }
+
+    #[test]
+    #[should_panic(expected: ('Caller not authorized',))]
+    fn run_test_return_funds_unauthorized() {
+        test_return_funds_unauthorized();
+    }
+
+    #[test]
+    #[should_panic(expected: ('Insufficient budget',))]
+    fn run_test_return_funds_insufficient_funds() {
+        test_return_funds_insufficient_funds();
+    }
+
+    // Implementation details below
+    
     fn test_initial_data() {
         let (contract_address, admin_address) = setup();
 
@@ -38,8 +94,8 @@ mod tests {
 
         assert(admin == admin_address, 'incorrect admin');
     }
+    
     // Simple tests for the Transaction struct
-    #[test]
     fn test_transaction_struct() {
         let tx = Transaction {
             id: 1,
@@ -70,7 +126,6 @@ mod tests {
         true
     }
 
-    #[test]
     fn test_pagination_validation() {
         // Valid parameters
         assert(validate_pagination(1, 10) == true, 'Valid params should pass');
@@ -84,7 +139,6 @@ mod tests {
         assert(validate_pagination(1, 101) == false, 'Size 101 invalid');
     }
 
-    #[test]
     fn test_all_get_fund_requests() {
         let (contract_address, _) = setup();
 
@@ -138,8 +192,6 @@ mod tests {
         }
     }
 
-    #[test]
-    #[should_panic]
     fn test_get_fund_requests_empty() {
         let (contract_address, _) = setup();
         let dispatcher = IBudgetDispatcher { contract_address };
@@ -148,7 +200,6 @@ mod tests {
         dispatcher.get_fund_requests(999_u64);
     }
 
-    #[test]
     fn test_get_fund_requests_after_multiple_additions() {
         let (contract_address, _) = setup();
         let dispatcher = IBudgetDispatcher { contract_address };
@@ -195,7 +246,6 @@ mod tests {
         }
     }
 
-    #[test]
     fn should_get_project_remaining_budget() {
         let (contract_address, admin_address) = setup();
 
@@ -221,7 +271,6 @@ mod tests {
         assert(remaining_budget == 100, 'incorrect remaining budget');
     }
 
-    #[test]
     fn test_return_funds_success() {
         // Setup contract and create organization/project
         let (contract_address, admin_address) = setup();
@@ -264,8 +313,6 @@ mod tests {
         assert(updated_budget == 800, 'Budget should be 800');
     }
 
-    #[test]
-    #[should_panic(expected: ('Caller not authorized',))]
     fn test_return_funds_unauthorized() {
         // Setup contract and create organization/project
         let (contract_address, admin_address) = setup();
@@ -301,8 +348,6 @@ mod tests {
         stop_cheat_caller_address(contract_address);
     }
 
-    #[test]
-    #[should_panic(expected: ('Insufficient budget',))]
     fn test_return_funds_insufficient_funds() {
         // Setup contract and create organization/project
         let (contract_address, admin_address) = setup();

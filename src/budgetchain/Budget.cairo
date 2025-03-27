@@ -1,3 +1,5 @@
+#[feature("deprecated-starknet-consts")]
+#[feature("starknet-storage-deprecation")]
 #[starknet::contract]
 pub mod Budget {
     use budgetchain_contracts::base::errors::*;
