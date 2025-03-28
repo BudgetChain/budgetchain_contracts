@@ -451,3 +451,48 @@ fn test_multiple_fund_releases() {
     assert(request1.status == FundRequestStatus::Approved, 'Request not marked approved');
     assert(request2.status == FundRequestStatus::Approved, 'Request not marked approved');
 }
+
+
+#[test]
+fn test_return_funds() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Complete milestone and create a new fund request as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(2));
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+
+    // Release funds as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    dispatcher.release_funds(org, project_id, request_id);
+
+    // Perform verification operations as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(3));
+
+    // Check project remaining budget was updated
+    let project = dispatcher.get_project(project_id);
+    assert(project.total_budget == total_budget - amount, 'Budget not updated correctly');
+
+    // Return funds as an admin
+    dispatcher.return_funds(project_id, 300);
+    assert(project.total_budget == total_budget - 300, 'Budget not updated correctly');
+}
