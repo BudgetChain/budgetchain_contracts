@@ -1,5 +1,7 @@
 use budgetchain_contracts::base::errors::*;
-use budgetchain_contracts::base::types::{FundRequestStatus, TRANSACTION_FUND_RELEASE};
+use budgetchain_contracts::base::types::{
+    FundRequestStatus, TRANSACTION_FUND_RELEASE, TRANSACTION_FUND_RETURN,
+};
 use budgetchain_contracts::budgetchain::Budget::*;
 use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
 use core::array::ArrayTrait;
@@ -15,6 +17,11 @@ use starknet::{ContractAddress, contract_address_const, get_block_timestamp};
 fn ADMIN() -> ContractAddress {
     contract_address_const::<'ADMIN'>()
 }
+
+fn USER2() -> ContractAddress {
+    contract_address_const::<'USER2'>()
+}
+
 
 fn ORGANIZATION() -> ContractAddress {
     contract_address_const::<'ORGANIZATION'>()
@@ -493,6 +500,149 @@ fn test_return_funds() {
     assert(project.total_budget == total_budget - amount, 'Budget not updated correctly');
 
     // Return funds as an admin
-    dispatcher.return_funds(project_id, 300);
-    assert(project.total_budget == total_budget - 300, 'Budget not updated correctly');
+    dispatcher.return_funds(project_id, amount);
+    assert(project.total_budget == total_budget, 'Budget not updated correctly');
+}
+
+#[test]
+fn test_successful_funds_return_transaction_recorded() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Complete milestone and create a new fund request as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(2));
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+
+    // Release funds as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    dispatcher.release_funds(org, project_id, request_id);
+
+    // Return funds as an admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(3));
+    let project = dispatcher.get_project(project_id);
+    dispatcher.return_funds(project_id, amount);
+
+    // Check transaction was recorded
+    let tx_counter = dispatcher.get_transaction_count();
+    assert(tx_counter == 2, 'Transaction not counted');
+
+    // Check transaction details
+    let tx = dispatcher.get_transaction(2).into().unwrap();
+    assert(tx.project_id == project_id, 'Wrong project ID in tx');
+    assert(tx.sender == admin, 'Wrong sender in tx');
+    assert(tx.recipient == project.org, 'Wrong recipient in tx');
+    assert(tx.amount == amount.try_into().unwrap(), 'Wrong amount in tx');
+    assert(tx.timestamp == get_block_timestamp(), 'Wrong block timestamp');
+    assert(tx.category == TRANSACTION_FUND_RETURN, 'Wrong tx category');
+    assert(tx.description == 'Returned unused funds', 'Wrong tx description')
+}
+
+
+#[test]
+fn test_successful_funds_return_event() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Complete milestone and create a new fund request as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(2));
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+
+    // Release funds as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    dispatcher.release_funds(org, project_id, request_id);
+
+    // Return funds as an admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(3));
+    // Set up event spy
+    let mut spy = spy_events();
+    dispatcher.return_funds(project_id, amount);
+
+    spy
+        .assert_emitted(
+            @array![
+                (
+                    contract_address,
+                    Budget::Event::FundsReturned(
+                        Budget::FundsReturned { project_id, amount, project_owner: admin },
+                    ),
+                ),
+            ],
+        );
+}
+
+#[test]
+#[should_panic(expected: 'Caller not authorized')]
+fn test_non_project_owner_cannot_return_funds() {
+    // Setup addresses
+    let admin = ADMIN();
+    let user2 = USER2();
+    let org = ORGANIZATION();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Complete milestone and create a new fund request as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(2));
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+
+    // Release funds as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    dispatcher.release_funds(org, project_id, request_id);
+
+    // Return funds as an user2
+    cheat_caller_address(contract_address, user2, CheatSpan::TargetCalls(1));
+    dispatcher.return_funds(project_id, amount);
 }
