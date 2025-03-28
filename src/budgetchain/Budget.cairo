@@ -510,6 +510,8 @@ pub mod Budget {
 
         fn get_project_remaining_budget(self: @ContractState, project_id: u64) -> u256 {
             let project = self.projects.read(project_id);
+            // Verify that the project exists
+            assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
             project.total_budget
         }
 
