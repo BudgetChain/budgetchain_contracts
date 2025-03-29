@@ -1,7 +1,7 @@
-use starknet::ContractAddress;
 use budgetchain_contracts::base::types::{
-    FundRequest, Project, Transaction, Organization, Milestone,
+    FundRequest, Milestone, Organization, Project, Transaction,
 };
+use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IBudget<TContractState> {

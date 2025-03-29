@@ -1,8 +1,8 @@
-use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
 use budgetchain_contracts::budgetchain::Budget;
+use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
 use snforge_std::{
-    CheatSpan, ContractClassTrait, DeclareResultTrait, stop_cheat_caller_address,
-    cheat_caller_address, declare, spy_events, EventSpyAssertionsTrait,
+    CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
+    cheat_caller_address, declare, spy_events, stop_cheat_caller_address,
 };
 use starknet::{ContractAddress, contract_address_const};
 
@@ -399,16 +399,10 @@ fn test_is_authorized_organization_after_adding_multiple_orgs() {
     stop_cheat_caller_address(admin_address);
 
     // Test authorization for each org
-    assert(
-        dispatcher.is_authorized_organization(org1) == true,
-        'Org1 should be authorized'
-    );
-    assert(
-        dispatcher.is_authorized_organization(org2) == true,
-        'Org2 should be authorized'
-    );
+    assert(dispatcher.is_authorized_organization(org1) == true, 'Org1 should be authorized');
+    assert(dispatcher.is_authorized_organization(org2) == true, 'Org2 should be authorized');
     assert!(
         dispatcher.is_authorized_organization(unauthorized) == false,
-        "Unauthorized address should return false"
+        "Unauthorized address should return false",
     );
 }
