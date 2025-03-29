@@ -685,7 +685,7 @@ pub mod Budget {
             assert(project.total_budget >= amount, ERROR_INSUFFICIENT_BUDGET);
 
             // Update the project's remaining budget
-            project.total_budget -= amount;
+            project.total_budget += amount;
             self.projects.write(project_id, project);
 
             // Create a transaction record for the returned funds
