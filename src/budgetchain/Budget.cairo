@@ -681,9 +681,6 @@ pub mod Budget {
             let caller = get_caller_address();
             assert(caller == project.owner, ERROR_UNAUTHORIZED);
 
-            // Ensure project has sufficient funds to return
-            assert(project.total_budget >= amount, ERROR_INSUFFICIENT_BUDGET);
-
             // Update the project's remaining budget
             project.total_budget += amount;
             self.projects.write(project_id, project);

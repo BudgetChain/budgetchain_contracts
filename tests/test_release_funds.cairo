@@ -499,9 +499,11 @@ fn test_return_funds() {
     let project = dispatcher.get_project(project_id);
     assert(project.total_budget == total_budget - amount, 'Budget not updated correctly');
 
+    let budget_after_release = project.total_budget;
+
     // Return funds as an admin
     dispatcher.return_funds(project_id, amount);
-    assert(project.total_budget == total_budget, 'Budget not updated correctly');
+    assert(project.total_budget == budget_after_release + amount, 'Funds not returned');
 }
 
 #[test]
