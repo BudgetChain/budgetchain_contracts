@@ -660,7 +660,7 @@ pub mod Budget {
 
         fn is_authorized_organization(self: @ContractState, org: ContractAddress) -> bool {
             self.org_addresses.read(org)
-
+        }
         fn get_fund_requests_counter(self: @ContractState) -> u64 {
             let request_id = self._fund_request_counter.read();
             let increased_id = request_id + 1;
