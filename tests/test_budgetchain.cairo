@@ -412,6 +412,7 @@ fn test_is_authorized_organization_after_adding_multiple_orgs() {
         dispatcher.is_authorized_organization(unauthorized) == false,
         "Unauthorized address should return false"
     );
+}
     
 #[test]    
 fn test_transaction_struct() {
