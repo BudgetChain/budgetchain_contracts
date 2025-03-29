@@ -1,8 +1,9 @@
-use budgetchain_contracts::budgetchain::Budget;
 use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
+use budgetchain_contracts::budgetchain::Budget;
+use budgetchain_contracts::base::types::{FundRequest, FundRequestStatus, Transaction};
 use snforge_std::{
-    CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
-    cheat_caller_address, declare, spy_events, stop_cheat_caller_address,
+    CheatSpan, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
+    stop_cheat_caller_address, cheat_caller_address, declare, spy_events, EventSpyAssertionsTrait,
 };
 use starknet::{ContractAddress, contract_address_const};
 
@@ -405,4 +406,98 @@ fn test_is_authorized_organization_after_adding_multiple_orgs() {
         dispatcher.is_authorized_organization(unauthorized) == false,
         "Unauthorized address should return false",
     );
+}
+    
+#[test]    
+fn test_transaction_struct() {
+    let tx = Transaction {
+        id: 1,
+        project_id: 1,
+        sender: contract_address_const::<1>(),
+        recipient: contract_address_const::<2>(),
+        amount: 1000_u128,
+        timestamp: 123456789_u64,
+        category: 'TEST',
+        description: 'Test transaction',
+    };
+
+    assert(tx.id == 1, 'ID should be 1');
+    assert(tx.amount == 1000_u128, 'Amount should be 1000');
+    assert(tx.category == 'TEST', 'Category should be TEST');
+}
+
+// Function to validate pagination parameters
+fn validate_pagination(page: u64, page_size: u64) -> bool {
+    if page == 0 {
+        return false;
+    }
+
+    if page_size == 0 || page_size > 100 {
+        return false;
+    }
+
+    true
+}
+
+#[test]
+fn test_pagination_validation() {
+    // Valid parameters
+    assert(validate_pagination(1, 10) == true, 'Valid params should pass');
+    assert(validate_pagination(2, 50) == true, 'Valid params should pass');
+
+    // Invalid page
+    assert(validate_pagination(0, 10) == false, 'Page 0 invalid');
+
+    // Invalid page size
+    assert(validate_pagination(1, 0) == false, 'Size 0 invalid');
+    assert(validate_pagination(1, 101) == false, 'Size 101 invalid');
+}
+
+#[test]
+#[should_panic(expected: 'Only project owner can request')]
+fn test__unauthorized_collection() {
+    let (contract_address, admin_address) = setup();
+    let caller = contract_address_const::<'address'>();
+    start_cheat_caller_address(contract_address, caller);
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    dispatcher.check_owner(caller, 20);
+}
+
+#[test]
+#[should_panic(expected: 'Milestone not completed')]
+fn test__milestone_completed() {
+    let (contract_address, admin_address) = setup();
+    let caller = contract_address_const::<'address'>();
+    start_cheat_caller_address(contract_address, caller);
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    dispatcher.check_milestone(caller, 20, 30);
+}
+
+#[test]
+fn test_state_change() {
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    let set_fund_request = dispatcher.set_fund_requests_counter(20);
+    assert_eq!(set_fund_request, true);
+}
+
+#[test]
+fn test_data() {
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Ensure dispatcher methods exist
+    let admin = dispatcher.get_admin();
+
+    assert(admin == admin_address, 'incorrect admin');
+
+    //Ensure dispatcher method exist
+    let get_transaction_count = dispatcher.get_transaction_count();
+    assert_eq!(get_transaction_count, 0);
+
+    let get_fund_request_counter = dispatcher.get_fund_requests_counter();
+    assert_eq!(get_fund_request_counter, 1);
 }

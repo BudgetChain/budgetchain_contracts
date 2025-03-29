@@ -21,4 +21,11 @@ pub const ERROR_REQUEST_NOT_PENDING: felt252 = 'Request not in Pending status';
 pub const ERROR_REWARDED_MILESTONE: felt252 = 'Milestone fund already released';
 pub const ERROR_ZERO_ADDRESS: felt252 = 'Zero address forbidden';
 pub const ERROR_ZERO_AMOUNT: felt252 = 'Zero amount forbidden';
-
+pub const UNAUTHORIZED: felt252 = 'Not authorized';
+pub const CALLER_NOT_ORG: felt252 = 'Caller must be org';
+pub const BUDGET_MISMATCH: felt252 = 'Milestone sum != total budget';
+pub const ARRAY_LENGTH_MISMATCH: felt252 = 'Array lengths mismatch';
+pub const ONLY_ADMIN: felt252 = 'ONLY ADMIN';
+pub const ERROR_FUNDS_ALREADY_RELEASED: felt252 = 'Funds already released';
+pub const ERROR_MILESTONE_NOT_COMPLETED: felt252 = 'Milestone not completed';
+pub const ERROR_UNAUTHORIZED_REQUESTER: felt252 = 'Only project owner can request';
