@@ -1,7 +1,7 @@
-use starknet::ContractAddress;
 use budgetchain_contracts::base::types::{
-    FundRequest, Project, Transaction, Organization, Milestone,
+    FundRequest, Milestone, Organization, Project, Transaction,
 };
+use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IBudget<TContractState> {
@@ -86,4 +86,7 @@ pub trait IBudget<TContractState> {
     fn check_owner(self: @TContractState, requester: ContractAddress, project_id: u64);
     fn set_fund_requests_counter(ref self: TContractState, value: u64) -> bool;
     fn get_fund_requests_counter(self: @TContractState) -> u64;
+
+    // Buget interface
+    fn get_project_budget(self: @TContractState, project_id: u64) -> u256;
 }

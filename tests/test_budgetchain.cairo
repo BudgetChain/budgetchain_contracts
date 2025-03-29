@@ -1,3 +1,4 @@
+use budgetchain_contracts::budgetchain::Budget;
 use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
 use budgetchain_contracts::budgetchain::Budget;
 use budgetchain_contracts::base::types::{FundRequest, FundRequestStatus, Transaction};
