@@ -1,9 +1,10 @@
-use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
-use budgetchain_contracts::budgetchain::Budget;
 use budgetchain_contracts::base::types::{FundRequest, FundRequestStatus, Transaction};
+use budgetchain_contracts::budgetchain::Budget;
+use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
 use snforge_std::{
-    CheatSpan, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-    stop_cheat_caller_address, cheat_caller_address, declare, spy_events, EventSpyAssertionsTrait,
+    CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
+    cheat_caller_address, declare, spy_events, start_cheat_caller_address,
+    stop_cheat_caller_address,
 };
 use starknet::{ContractAddress, contract_address_const};
 
@@ -407,8 +408,8 @@ fn test_is_authorized_organization_after_adding_multiple_orgs() {
         "Unauthorized address should return false",
     );
 }
-    
-#[test]    
+
+#[test]
 fn test_transaction_struct() {
     let tx = Transaction {
         id: 1,
