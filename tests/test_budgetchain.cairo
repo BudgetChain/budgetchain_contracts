@@ -340,3 +340,75 @@ fn test_allocate_project_budget_not_authorized() {
             org_address, proj_owner, 100, array!['Milestone1', 'Milestone2'], array![90, 10],
         );
 }
+
+#[test]
+fn test_is_authorized_organization_for_authorized_org() {
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    let name = 'Test Org';
+    let org_address = contract_address_const::<'org1'>();
+    let mission = 'Test Mission';
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_organization(name, org_address, mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Test authorization
+    let is_authorized = dispatcher.is_authorized_organization(org_address);
+    assert!(is_authorized == true, "Authorized organization should return true");
+
+    // Test non-existent/unauthorized address
+    let non_existent_address = contract_address_const::<'none'>();
+    let is_authorized = dispatcher.is_authorized_organization(non_existent_address);
+    assert!(!is_authorized, "Non-existent address should not be authorized");
+}
+
+#[test]
+fn test_is_authorized_organization_for_zero_address() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    let zero_address = contract_address_const::<0>();
+
+    // Test authorization
+    let is_authorized = dispatcher.is_authorized_organization(zero_address);
+    assert!(is_authorized == false, "Zero address should return false");
+}
+
+#[test]
+fn test_is_authorized_organization_after_adding_multiple_orgs() {
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    let name1 = 'Org1';
+    let org1 = contract_address_const::<'org1'>();
+    let mission1 = 'Mission1';
+
+    let name2 = 'Org2';
+    let org2 = contract_address_const::<'org2'>();
+    let mission2 = 'Mission2';
+
+    let unauthorized = contract_address_const::<'unauthorized'>();
+
+    // Add multiple organizations
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_organization(name1, org1, mission1);
+    dispatcher.create_organization(name2, org2, mission2);
+    stop_cheat_caller_address(admin_address);
+
+    // Test authorization for each org
+    assert(
+        dispatcher.is_authorized_organization(org1) == true,
+        'Org1 should be authorized'
+    );
+    assert(
+        dispatcher.is_authorized_organization(org2) == true,
+        'Org2 should be authorized'
+    );
+    assert!(
+        dispatcher.is_authorized_organization(unauthorized) == false,
+        "Unauthorized address should return false"
+    );
+}

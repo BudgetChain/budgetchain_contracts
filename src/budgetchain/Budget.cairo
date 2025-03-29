@@ -640,5 +640,9 @@ pub mod Budget {
                     ),
                 );
         }
+
+        fn is_authorized_organization(self: @ContractState, org: ContractAddress) -> bool {
+            self.org_addresses.read(org)
+        }
     }
 }
