@@ -518,6 +518,15 @@ pub mod Budget {
         }
 
         fn get_fund_request(self: @ContractState, project_id: u64, request_id: u64) -> FundRequest {
+            // Verify project exists
+            let project = self.projects.read(project_id);
+            assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
+
+            // Verify caller's authorization
+            // Caller must be either project org or admin
+            let caller = get_caller_address();
+            assert(caller == self.admin.read() || caller == project.org, ERROR_UNAUTHORIZED);
+
             self.fund_requests.read((project_id, request_id))
         }
 
@@ -692,6 +701,18 @@ pub mod Budget {
             milestone_id: u64,
             request_id: u64,
         ) -> bool {
+            // Verify project exists
+            let project = self.projects.read(project_id);
+            assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
+
+            // Verify caller's authorization
+            // Caller must be either project org or admin
+            assert(requester == self.admin.read() || requester == project.org, ERROR_UNAUTHORIZED);
+
+            // Verify milestone exists
+            let milestone = self.milestones.read((project_id, milestone_id));
+            assert(milestone.project_id == project_id, ERROR_INVALID_MILESTONE);
+
             // Store the funds request details
             self.fund_request.write(request_id, (project_id, milestone_id, requester));
 

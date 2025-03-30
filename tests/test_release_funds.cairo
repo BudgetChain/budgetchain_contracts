@@ -451,3 +451,153 @@ fn test_multiple_fund_releases() {
     assert(request1.status == FundRequestStatus::Approved, 'Request not marked approved');
     assert(request2.status == FundRequestStatus::Approved, 'Request not marked approved');
 }
+
+#[test]
+fn test_get_multiple_fund_request() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Complete milestone and create a new fund request as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::Indefinite);
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+
+    // check fund request status should be pending by default
+    // first assertion
+    let request = dispatcher.get_fund_request(project_id, request_id);
+    assert(request.status == FundRequestStatus::Pending, 'Request should be pending');
+
+    // second assertion
+    let request = dispatcher.get_fund_request(project_id, request_id);
+    assert(request.status == FundRequestStatus::Pending, 'Request should be pending');
+
+    // third assertion
+    let request = dispatcher.get_fund_request(project_id, request_id);
+    assert(request.status == FundRequestStatus::Pending, 'Request should be pending');
+}
+
+#[test]
+#[should_panic(expected: 'Caller not authorized')]
+fn test_get_fund_request_with_unauthorize_caller() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+    let non_org = NON_ORG();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Complete milestone and create a new fund request as admin
+    cheat_caller_address(contract_address, non_org, CheatSpan::Indefinite);
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+
+    // check fund request status should be pending by default
+    // first assertion
+    let request = dispatcher.get_fund_request(project_id, request_id);
+    assert(request.status == FundRequestStatus::Pending, 'Request should be pending');
+}
+
+#[test]
+fn test_write_fund_request() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Create milestones as admin and set as complete
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(3));
+    let milestone_id_1: u64 = 1;
+    let requester_id_1: u64 = 19;
+    dispatcher.set_milestone_complete(project_id, milestone_id_1);
+    // first write request by admin
+    dispatcher.write_fund_request(admin, project_id, milestone_id_1, requester_id_1);
+
+    let milestone_id_2: u64 = 1;
+    let requester_id_2: u64 = 19;
+    // second write request by org
+    dispatcher.write_fund_request(admin, project_id, milestone_id_2, requester_id_2);
+}
+
+#[test]
+#[should_panic(expected: 'Caller not authorized')]
+fn test_write_fund_request_unauthorize_caller() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+    let non_org = NON_ORG();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Create milestones as admin and set as complete
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(2));
+    let milestone_id_1: u64 = 1;
+    let requester_id_1: u64 = 19;
+    dispatcher.set_milestone_complete(project_id, milestone_id_1);
+
+    //test will panic when non_org try perform a write fn
+    dispatcher.write_fund_request(non_org, project_id, milestone_id_1, requester_id_1);
+}
