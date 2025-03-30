@@ -1,9 +1,10 @@
-use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
-use budgetchain_contracts::budgetchain::Budget;
 use budgetchain_contracts::base::types::{FundRequest, FundRequestStatus, Transaction};
+use budgetchain_contracts::budgetchain::Budget;
+use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
 use snforge_std::{
-    CheatSpan, ContractClassTrait, DeclareResultTrait, start_cheat_caller_address,
-    stop_cheat_caller_address, cheat_caller_address, declare, spy_events, EventSpyAssertionsTrait,
+    CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
+    cheat_caller_address, declare, spy_events, start_cheat_caller_address,
+    stop_cheat_caller_address,
 };
 use starknet::{ContractAddress, contract_address_const};
 
@@ -343,6 +344,72 @@ fn test_allocate_project_budget_not_authorized() {
 }
 
 #[test]
+fn test_is_authorized_organization_for_authorized_org() {
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    let name = 'Test Org';
+    let org_address = contract_address_const::<'org1'>();
+    let mission = 'Test Mission';
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_organization(name, org_address, mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Test authorization
+    let is_authorized = dispatcher.is_authorized_organization(org_address);
+    assert!(is_authorized == true, "Authorized organization should return true");
+
+    // Test non-existent/unauthorized address
+    let non_existent_address = contract_address_const::<'none'>();
+    let is_authorized = dispatcher.is_authorized_organization(non_existent_address);
+    assert!(!is_authorized, "Non-existent address should not be authorized");
+}
+
+#[test]
+fn test_is_authorized_organization_for_zero_address() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    let zero_address = contract_address_const::<0>();
+
+    // Test authorization
+    let is_authorized = dispatcher.is_authorized_organization(zero_address);
+    assert!(is_authorized == false, "Zero address should return false");
+}
+
+#[test]
+fn test_is_authorized_organization_after_adding_multiple_orgs() {
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    let name1 = 'Org1';
+    let org1 = contract_address_const::<'org1'>();
+    let mission1 = 'Mission1';
+
+    let name2 = 'Org2';
+    let org2 = contract_address_const::<'org2'>();
+    let mission2 = 'Mission2';
+
+    let unauthorized = contract_address_const::<'unauthorized'>();
+
+    // Add multiple organizations
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_organization(name1, org1, mission1);
+    dispatcher.create_organization(name2, org2, mission2);
+    stop_cheat_caller_address(admin_address);
+
+    // Test authorization for each org
+    assert(dispatcher.is_authorized_organization(org1) == true, 'Org1 should be authorized');
+    assert(dispatcher.is_authorized_organization(org2) == true, 'Org2 should be authorized');
+    assert!(
+        dispatcher.is_authorized_organization(unauthorized) == false,
+        "Unauthorized address should return false",
+    );
+}
+
+#[test]
 fn test_transaction_struct() {
     let tx = Transaction {
         id: 1,
@@ -388,17 +455,6 @@ fn test_pagination_validation() {
 }
 
 #[test]
-#[should_panic(expected: 'Milestone not completed')]
-fn test__milestone_completed() {
-    let (contract_address, admin_address) = setup();
-    let caller = contract_address_const::<'address'>();
-    start_cheat_caller_address(contract_address, caller);
-    let dispatcher = IBudgetDispatcher { contract_address };
-
-    dispatcher.check_milestone(caller, 20, 30);
-}
-
-#[test]
 #[should_panic(expected: 'Only project owner can request')]
 fn test__unauthorized_collection() {
     let (contract_address, admin_address) = setup();
@@ -407,6 +463,17 @@ fn test__unauthorized_collection() {
     let dispatcher = IBudgetDispatcher { contract_address };
 
     dispatcher.check_owner(caller, 20);
+}
+
+#[test]
+#[should_panic(expected: 'Milestone not completed')]
+fn test__milestone_completed() {
+    let (contract_address, admin_address) = setup();
+    let caller = contract_address_const::<'address'>();
+    start_cheat_caller_address(contract_address, caller);
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    dispatcher.check_milestone(caller, 20, 30);
 }
 
 #[test]
