@@ -674,7 +674,6 @@ pub mod Budget {
 
         /// Allows project owners to return unused funds
         fn return_funds(ref self: ContractState, project_id: u64, request_id: u64) {
-
             // Get the project details
             let mut project = self.projects.read(project_id);
             assert(project.id == project_id, ERROR_INVALID_PROJECT_ID);
@@ -734,7 +733,9 @@ pub mod Budget {
             self
                 .emit(
                     Event::FundsReturned(
-                        FundsReturned { project_id, amount: request.amount.into() , project_owner: caller },
+                        FundsReturned {
+                            project_id, amount: request.amount.into(), project_owner: caller,
+                        },
                     ),
                 );
         }
