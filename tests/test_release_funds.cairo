@@ -502,7 +502,7 @@ fn test_return_funds() {
     let budget_after_release = project.total_budget;
 
     // Return funds as an admin
-    dispatcher.return_funds(project_id, amount);
+    dispatcher.return_funds(project_id, request_id);
     assert(project.total_budget == budget_after_release + amount, 'Funds not returned');
 }
 
@@ -541,7 +541,7 @@ fn test_successful_funds_return_transaction_recorded() {
     // Return funds as an admin
     cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(3));
     let project = dispatcher.get_project(project_id);
-    dispatcher.return_funds(project_id, amount);
+    dispatcher.return_funds(project_id, request_id);
 
     // Check transaction was recorded
     let tx_counter = dispatcher.get_transaction_count();
@@ -595,7 +595,7 @@ fn test_successful_funds_return_event() {
     cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(3));
     // Set up event spy
     let mut spy = spy_events();
-    dispatcher.return_funds(project_id, amount);
+    dispatcher.return_funds(project_id, request_id);
 
     spy
         .assert_emitted(
@@ -646,5 +646,5 @@ fn test_non_project_owner_cannot_return_funds() {
 
     // Return funds as an user2
     cheat_caller_address(contract_address, user2, CheatSpan::TargetCalls(1));
-    dispatcher.return_funds(project_id, amount);
+    dispatcher.return_funds(project_id, request_id);
 }

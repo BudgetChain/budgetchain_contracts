@@ -669,9 +669,7 @@ pub mod Budget {
         }
 
         /// Allows project owners to return unused funds
-        fn return_funds(ref self: ContractState, project_id: u64, amount: u256) {
-            // Validate inputs
-            assert(amount > 0_u256, ERROR_ZERO_AMOUNT);
+        fn return_funds(ref self: ContractState, project_id: u64, request_id: u64) {
 
             // Get the project details
             let mut project = self.projects.read(project_id);
@@ -681,8 +679,13 @@ pub mod Budget {
             let caller = get_caller_address();
             assert(caller == project.owner, ERROR_UNAUTHORIZED);
 
+            // Validate fund request
+            let mut request = self.fund_requests.read((project_id, request_id));
+            assert(request.project_id == project_id, ERROR_INVALID_PROJECT_ID);
+            assert(request.status == FundRequestStatus::Approved, ERROR_REQUEST_NOT_APPROVED);
+
             // Update the project's remaining budget
-            project.total_budget += amount;
+            project.total_budget += request.amount.into();
             self.projects.write(project_id, project);
 
             // Create a transaction record for the returned funds
@@ -694,7 +697,7 @@ pub mod Budget {
                 project_id,
                 sender: caller,
                 recipient: project.org,
-                amount: amount.try_into().unwrap(),
+                amount: request.amount.try_into().unwrap(),
                 timestamp: get_block_timestamp(),
                 category: TRANSACTION_FUND_RETURN,
                 description: 'Returned unused funds',
@@ -716,7 +719,7 @@ pub mod Budget {
                         id: transaction_id.into(),
                         sender: caller,
                         recipient: project.org,
-                        amount: amount.try_into().unwrap(),
+                        amount: request.amount.into(),
                         timestamp: get_block_timestamp(),
                         category: TRANSACTION_FUND_RETURN,
                         description: 'Returned unused funds',
@@ -727,7 +730,7 @@ pub mod Budget {
             self
                 .emit(
                     Event::FundsReturned(
-                        FundsReturned { project_id, amount, project_owner: caller },
+                        FundsReturned { project_id, amount: request.amount.into() , project_owner: caller },
                     ),
                 );
         }

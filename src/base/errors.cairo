@@ -18,6 +18,7 @@ pub const ERROR_INVALID_TRANSACTION_ID: felt252 = 'Invalid transaction ID';
 pub const ERROR_MILESTONE_ALREADY_COMPLETED: felt252 = 'Milestone already completed';
 pub const ERROR_NO_TRANSACTIONS: felt252 = 'No transactions found';
 pub const ERROR_REQUEST_NOT_PENDING: felt252 = 'Request not in Pending status';
+pub const ERROR_REQUEST_NOT_APPROVED: felt252 = 'Request not in Approved status';
 pub const ERROR_REWARDED_MILESTONE: felt252 = 'Milestone fund already released';
 pub const ERROR_ZERO_ADDRESS: felt252 = 'Zero address forbidden';
 pub const ERROR_ZERO_AMOUNT: felt252 = 'Zero amount forbidden';
