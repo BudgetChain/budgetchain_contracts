@@ -634,8 +634,8 @@ fn test_write_fund_request_unauthorize_caller() {
     dispatcher.write_fund_request(non_org, project_id, milestone_id_1, requester_id_1);
 }
 #[test]
-fn test_fund_request_counter(){
-        // Setup addresses
+fn test_fund_request_counter() {
+    // Setup addresses
     let admin = ADMIN();
     let org = ORGANIZATION();
 
@@ -655,14 +655,14 @@ fn test_fund_request_counter(){
         .allocate_project_budget(
             org, admin, total_budget, array![description, description], array![amount, amount],
         );
-     // Complete milestone and create a new fund request as admin
+    // Complete milestone and create a new fund request as admin
     cheat_caller_address(contract_address, admin, CheatSpan::Indefinite);
     dispatcher.set_milestone_complete(project_id, milestone_id);
     let request_id = dispatcher.create_fund_request(project_id, milestone_id);
-    
+
     // set and get fund count
     let fund_request = dispatcher.get_fund_request(project_id, request_id);
-    dispatcher.set_fund_requests(fund_request,request_id);
+    dispatcher.set_fund_requests(fund_request, request_id);
     let count = dispatcher.get_fund_requests_counts(project_id);
 
     assert!(count == request_id + 1, "fund request count is not updated");
