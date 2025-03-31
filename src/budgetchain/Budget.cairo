@@ -1,29 +1,24 @@
 #[feature("deprecated_legacy_map")]
 #[starknet::contract]
 pub mod Budget {
-    use starknet::storage::{
-        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
-        StoragePointerWriteAccess, StoragePathEntry,
+    use budgetchain_contracts::base::errors::*;
+    use budgetchain_contracts::base::types::{
+        ADMIN_ROLE, FundRequest, FundRequestStatus, Milestone, ORGANIZATION_ROLE, Organization,
+        Project, TRANSACTION_FUND_RELEASE, TRANSACTION_FUND_RETURN, Transaction,
     };
-    use starknet::storage::{MutableVecTrait, Vec, VecTrait};
-    use core::array::Array;
-
-    use core::array::ArrayTrait;
+    use budgetchain_contracts::interfaces::IBudget::IBudget;
+    use core::array::{Array, ArrayTrait};
     use core::option::Option;
     use core::result::Result;
-    use budgetchain_contracts::base::types::{
-        Organization, Transaction, Project, Milestone, TRANSACTION_FUND_RETURN,
-    };
     use openzeppelin::access::accesscontrol::{AccessControlComponent, DEFAULT_ADMIN_ROLE};
     use openzeppelin::introspection::src5::SRC5Component;
+    use starknet::storage::{
+        Map, MutableVecTrait, StorageMapReadAccess, StorageMapWriteAccess, StoragePathEntry,
+        StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
+    };
     use starknet::{
         ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
     };
-    use budgetchain_contracts::base::errors::*;
-    use budgetchain_contracts::base::types::{
-        FundRequest, FundRequestStatus, ADMIN_ROLE, ORGANIZATION_ROLE, TRANSACTION_FUND_RELEASE,
-    };
-    use budgetchain_contracts::interfaces::IBudget::IBudget;
     component!(path: AccessControlComponent, storage: accesscontrol, event: AccessControlEvent);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
 
@@ -47,9 +42,9 @@ pub mod Budget {
         project_count: u64,
         projects: Map<u64, Project>,
         all_transaction_ids: Map<u64, u64>, // index -> transaction_id
-        fund_requests: Map::<(u64, u64), FundRequest>, // Key: (project_id, request_id)
-        fund_requests_count: Map::<u64, u64>, // Key: project_id, Value: count of requests
-        project_budgets: Map::<u64, u128>, // Key: project_id, Value: remaining budget
+        fund_requests: Map<(u64, u64), FundRequest>, // Key: (project_id, request_id)
+        fund_requests_count: Map<u64, u64>, // Key: project_id, Value: count of requests
+        project_budgets: Map<u64, u128>, // Key: project_id, Value: remaining budget
         org_count: u256,
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
@@ -528,6 +523,15 @@ pub mod Budget {
         }
 
         fn get_fund_request(self: @ContractState, project_id: u64, request_id: u64) -> FundRequest {
+            // Verify project exists
+            let project = self.projects.read(project_id);
+            assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
+
+            // Verify caller's authorization
+            // Caller must be either project org or admin
+            let caller = get_caller_address();
+            assert(caller == self.admin.read() || caller == project.org, ERROR_UNAUTHORIZED);
+
             self.fund_requests.read((project_id, request_id))
         }
 
@@ -735,7 +739,9 @@ pub mod Budget {
                 );
         }
 
-
+        fn is_authorized_organization(self: @ContractState, org: ContractAddress) -> bool {
+            self.org_addresses.read(org)
+        }
         fn get_fund_requests_counter(self: @ContractState) -> u64 {
             let request_id = self._fund_request_counter.read();
             let increased_id = request_id + 1;
@@ -769,6 +775,18 @@ pub mod Budget {
             milestone_id: u64,
             request_id: u64,
         ) -> bool {
+            // Verify project exists
+            let project = self.projects.read(project_id);
+            assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
+
+            // Verify caller's authorization
+            // Caller must be either project org or admin
+            assert(requester == self.admin.read() || requester == project.org, ERROR_UNAUTHORIZED);
+
+            // Verify milestone exists
+            let milestone = self.milestones.read((project_id, milestone_id));
+            assert(milestone.project_id == project_id, ERROR_INVALID_MILESTONE);
+
             // Store the funds request details
             self.fund_request.write(request_id, (project_id, milestone_id, requester));
 
