@@ -4,7 +4,7 @@ pub mod Budget {
     use budgetchain_contracts::base::errors::*;
     use budgetchain_contracts::base::types::{
         ADMIN_ROLE, FundRequest, FundRequestStatus, Milestone, ORGANIZATION_ROLE, Organization,
-        Project, TRANSACTION_FUND_RELEASE, Transaction,
+        Project, TRANSACTION_FUND_RELEASE, TRANSACTION_FUND_RETURN, Transaction,
     };
     use budgetchain_contracts::interfaces::IBudget::IBudget;
     use core::array::{Array, ArrayTrait};
@@ -69,6 +69,7 @@ pub mod Budget {
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         FundsReleased: FundsReleased,
+        FundsReturned: FundsReturned,
         TransactionCreated: TransactionCreated,
         ProjectAllocated: ProjectAllocated,
         OrganizationAdded: OrganizationAdded,
@@ -88,6 +89,13 @@ pub mod Budget {
         pub request_id: u64,
         pub milestone_id: u64,
         pub amount: u128,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct FundsReturned {
+        pub project_id: u64,
+        pub amount: u256,
+        pub project_owner: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -661,6 +669,74 @@ pub mod Budget {
                             request_id,
                             milestone_id: request.milestone_id.into(),
                             amount: request.amount,
+                        },
+                    ),
+                );
+        }
+
+        /// Allows project owners to return unused funds
+        fn return_funds(ref self: ContractState, project_id: u64, request_id: u64) {
+            // Get the project details
+            let mut project = self.projects.read(project_id);
+            assert(project.id == project_id, ERROR_INVALID_PROJECT_ID);
+
+            // Verify caller is the project owner
+            let caller = get_caller_address();
+            assert(caller == project.owner, ERROR_UNAUTHORIZED);
+
+            // Validate fund request
+            let mut request = self.fund_requests.read((project_id, request_id));
+            assert(request.project_id == project_id, ERROR_INVALID_PROJECT_ID);
+            assert(request.status == FundRequestStatus::Approved, ERROR_REQUEST_NOT_APPROVED);
+
+            // Update the project's remaining budget
+            project.total_budget += request.amount.into();
+            self.projects.write(project_id, project);
+
+            // Create a transaction record for the returned funds
+            let transaction_id = self.transaction_count.read() + 1;
+
+            // Record the transaction (send funds back to the organization)
+            let transaction = Transaction {
+                id: transaction_id,
+                project_id,
+                sender: caller,
+                recipient: project.org,
+                amount: request.amount.try_into().unwrap(),
+                timestamp: get_block_timestamp(),
+                category: TRANSACTION_FUND_RETURN,
+                description: 'Returned unused funds',
+            };
+
+            // Save transaction ID to project transaction IDs
+            self.project_transaction_ids.entry(project_id).append().write(transaction_id);
+
+            // Save transaction to all transactions array
+            self.all_transactions.append().write(transaction);
+
+            // Update transaction counter
+            self.transaction_count.write(transaction_id);
+
+            // Emit the TransactionCreated event
+            self
+                .emit(
+                    TransactionCreated {
+                        id: transaction_id.into(),
+                        sender: caller,
+                        recipient: project.org,
+                        amount: request.amount.into(),
+                        timestamp: get_block_timestamp(),
+                        category: TRANSACTION_FUND_RETURN,
+                        description: 'Returned unused funds',
+                    },
+                );
+
+            // Emit the FundsReturned event
+            self
+                .emit(
+                    Event::FundsReturned(
+                        FundsReturned {
+                            project_id, amount: request.amount.into(), project_owner: caller,
                         },
                     ),
                 );

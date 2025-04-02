@@ -52,6 +52,7 @@ pub trait IBudget<TContractState> {
     fn release_funds(
         ref self: TContractState, org: ContractAddress, project_id: u64, request_id: u64,
     );
+    fn return_funds(ref self: TContractState, project_id: u64, request_id: u64);
 
     // Milestone Management
     fn create_milestone(
