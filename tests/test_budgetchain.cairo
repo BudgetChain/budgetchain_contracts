@@ -1,6 +1,8 @@
 use budgetchain_contracts::base::types::{FundRequest, FundRequestStatus, Transaction};
 use budgetchain_contracts::budgetchain::Budget;
-use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
+use budgetchain_contracts::interfaces::IBudget::{
+    IBudgetDispatcher, IBudgetDispatcherTrait, IBudgetSafeDispatcher, IBudgetSafeDispatcherTrait,
+};
 use snforge_std::{
     CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
     cheat_caller_address, declare, spy_events, start_cheat_caller_address,
@@ -834,7 +836,6 @@ fn test_get_project_transactions_single_transaction() {
 }
 
 #[test]
-#[should_panic(expected: 'ERROR_INVALID_PAGE_SIZE')]
 fn test_get_project_transactions_invalid_page_size() {
     let (
         contract_address, _admin_address, _org_address, _project_owner, project_id, _total_budget,
@@ -842,52 +843,53 @@ fn test_get_project_transactions_invalid_page_size() {
         setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
 
-    dispatcher.get_project_transactions(project_id, 1, 0);
+    let result = dispatcher.get_project_transactions(project_id, 1, 0);
+
+    assert(result.is_err(), 'ERROR_INVALID_PAGE_SIZE');
 }
-// #[test]
-// #[should_panic(expected: 'ERROR_INVALID_PAGE')]
-// fn test_get_project_transactions_invalid_page_zero() {
-//     let (
-//         contract_address, _admin_address, _org_address, _project_owner, project_id,
-//         _total_budget,
-//     ) =
-//         setup_project_with_milestones();
-//     let dispatcher = IBudgetDispatcher { contract_address };
 
-//     // Test with page = 0
-//     dispatcher.get_project_transactions(project_id, 0, 1);
-// }
+#[test]
+fn test_get_project_transactions_invalid_page_zero() {
+    let (
+        contract_address, _admin_address, _org_address, _project_owner, project_id, _total_budget,
+    ) =
+        setup_project_with_milestones();
+    let dispatcher = IBudgetDispatcher { contract_address };
 
-// #[test]
-// #[should_panic(expected: 'ERROR_NO_TRANSACTIONS')]
-// fn test_get_project_transactions_no_transactions() {
-//     let (
-//         contract_address, _admin_address, _org_address, _project_owner, project_id,
-//         _total_budget,
-//     ) =
-//         setup_project_with_milestones();
-//     let dispatcher = IBudgetDispatcher { contract_address };
+    // Test with page = 0
+    let result = dispatcher.get_project_transactions(project_id, 0, 1);
 
-//     // No transactions seeded
-//     dispatcher.get_project_transactions(project_id, 1, 1);
-// }
+    assert(result.is_err(), 'ERROR_INVALID_PAGE');
+}
 
-// #[test]
-// #[should_panic(expected: 'ERROR_INVALID_PAGE')]
-// fn test_get_project_transactions_page_beyond_total() {
-//     let (contract_address, admin_address, _org_address, _project_owner, project_id,
-//     _total_budget) =
-//         setup_project_with_milestones();
-//     let dispatcher = IBudgetDispatcher { contract_address };
-//     let recipient = contract_address_const::<'recipient'>();
+#[test]
+fn test_get_project_transactions_no_transactions() {
+    let (
+        contract_address, _admin_address, _org_address, _project_owner, project_id, _total_budget,
+    ) =
+        setup_project_with_milestones();
+    let dispatcher = IBudgetDispatcher { contract_address };
 
-//     // Seed one transaction
-//     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-//     dispatcher.create_transaction(project_id, recipient, 100_u128, 'CAT', 'Tx1').unwrap();
-//     stop_cheat_caller_address(admin_address);
+    // No transactions seeded
+    let result = dispatcher.get_project_transactions(project_id, 1, 1);
 
-//     // Test page 2 with only 1 transaction
-//     dispatcher.get_project_transactions(project_id, 2, 1);
-// }
+    assert(result.is_err(), 'ERROR_INVALID_PAGE');
+}
+#[test]
+fn test_get_project_transactions_page_beyond_total() {
+    let (contract_address, admin_address, _org_address, _project_owner, project_id, _total_budget) =
+        setup_project_with_milestones();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
 
+    // Seed one transaction
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_transaction(project_id, recipient, 100_u128, 'CAT', 'Tx1').unwrap();
+    stop_cheat_caller_address(admin_address);
+
+    // Test page 2 with only 1 transaction
+    let result = dispatcher.get_project_transactions(project_id, 2, 1);
+
+    assert(result.is_err(), 'ERROR_INVALID_PAGE');
+}
 
