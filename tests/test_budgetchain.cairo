@@ -1,8 +1,6 @@
-use budgetchain_contracts::base::types::{FundRequest, FundRequestStatus, Transaction};
+use budgetchain_contracts::base::types::{Transaction};
 use budgetchain_contracts::budgetchain::Budget;
-use budgetchain_contracts::interfaces::IBudget::{
-    IBudgetDispatcher, IBudgetDispatcherTrait, IBudgetSafeDispatcher, IBudgetSafeDispatcherTrait,
-};
+use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
 use snforge_std::{
     CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
     cheat_caller_address, declare, spy_events, start_cheat_caller_address,
@@ -44,7 +42,7 @@ fn setup_project_with_milestones() -> (
 
     // Set admin as caller to create organization
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    let org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    let _org_id = dispatcher.create_organization(org_name, org_address, org_mission);
     stop_cheat_caller_address(admin_address);
 
     // Create project with initial budget of 1000
@@ -97,7 +95,7 @@ fn test_create_organization() {
 #[test]
 #[should_panic(expected: 'ONLY ADMIN')]
 fn test_create_organization_with_not_admin() {
-    let (contract_address, admin_address) = setup();
+    let (contract_address, _admin_address) = setup();
 
     let dispatcher = IBudgetDispatcher { contract_address };
 
@@ -179,7 +177,7 @@ fn test_create_milestone_successfully() {
     let mission = 'Help the Poor';
 
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    let org0_id = dispatcher.create_organization(name, org_address, mission);
+    let _org0_id = dispatcher.create_organization(name, org_address, mission);
     dispatcher.create_milestone(org_address, 12, 'Feed Dogs in Lekki', 2);
     stop_cheat_caller_address(admin_address);
 }
@@ -195,7 +193,7 @@ fn test_create_multiple_milestone_successfully() {
     let mission = 'Help the Poor';
 
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    let org0_id = dispatcher.create_organization(name, org_address, mission);
+    let _org0_id = dispatcher.create_organization(name, org_address, mission);
     dispatcher.create_milestone(org_address, 12, 'Feed Dogs in Lekki', 2);
     dispatcher.create_milestone(org_address, 18, 'Feed Dogs in Kubwa', 20);
     stop_cheat_caller_address(admin_address);
@@ -237,7 +235,7 @@ fn test_create_milestone_data_saved() {
     let milestone_amount = 2;
 
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    let org0_id = dispatcher.create_organization(name, org_address, mission);
+    let _org0_id = dispatcher.create_organization(name, org_address, mission);
     let milestone_id = dispatcher
         .create_milestone(org_address, project_id, milestone_description, milestone_amount);
     stop_cheat_caller_address(admin_address);
@@ -291,7 +289,7 @@ fn test_allocate_project_budget_success() {
             ],
         );
     let milestone1 = dispatcher.get_milestone(project_id, 0);
-    let milestone2 = dispatcher.get_milestone(project_id, 1);
+    let _milestone2 = dispatcher.get_milestone(project_id, 1);
     assert(milestone1.milestone_description == 'Milestone1', 'incorrect milestone description');
     assert(milestone1.milestone_amount == 90, 'incorrect amount');
 }
@@ -496,7 +494,7 @@ fn test_pagination_validation() {
 #[test]
 #[should_panic(expected: 'Only project owner can request')]
 fn test__unauthorized_collection() {
-    let (contract_address, admin_address) = setup();
+    let (contract_address, _admin_address) = setup();
     let caller = contract_address_const::<'address'>();
     start_cheat_caller_address(contract_address, caller);
     let dispatcher = IBudgetDispatcher { contract_address };
@@ -507,7 +505,7 @@ fn test__unauthorized_collection() {
 #[test]
 #[should_panic(expected: 'Milestone not completed')]
 fn test__milestone_completed() {
-    let (contract_address, admin_address) = setup();
+    let (contract_address, _admin_address) = setup();
     let caller = contract_address_const::<'address'>();
     start_cheat_caller_address(contract_address, caller);
     let dispatcher = IBudgetDispatcher { contract_address };
@@ -517,7 +515,7 @@ fn test__milestone_completed() {
 
 #[test]
 fn test_state_change() {
-    let (contract_address, admin_address) = setup();
+    let (contract_address, _admin_address) = setup();
     let dispatcher = IBudgetDispatcher { contract_address };
 
     let set_fund_request = dispatcher.set_fund_requests_counter(20);
@@ -873,7 +871,7 @@ fn test_get_project_transactions_no_transactions() {
     // No transactions seeded
     let result = dispatcher.get_project_transactions(project_id, 1, 1);
 
-    assert(result.is_err(), 'ERROR_INVALID_PAGE');
+    assert(result.is_err(), 'ERROR_NO_TRANSACTIONS');
 }
 #[test]
 fn test_get_project_transactions_page_beyond_total() {
