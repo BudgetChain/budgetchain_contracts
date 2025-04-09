@@ -544,7 +544,7 @@ fn test_data() {
 #[test]
 fn test_get_project_remaining_budget_initial() {
     // Setup project with milestones
-    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+    let (contract_address, _admin_address, _org_address, _project_owner, project_id, total_budget) =
         setup_project_with_milestones();
 
     let dispatcher = IBudgetDispatcher { contract_address };
@@ -557,7 +557,7 @@ fn test_get_project_remaining_budget_initial() {
 #[test]
 fn test_get_project_remaining_budget_after_milestone_creation() {
     // Setup project with milestones
-    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+    let (contract_address, admin_address, org_address, _project_owner, project_id, total_budget) =
         setup_project_with_milestones();
 
     let dispatcher = IBudgetDispatcher { contract_address };
@@ -704,7 +704,7 @@ fn test_get_project_remaining_budget_zero_funding() {
 
     // Set admin as caller to create organization
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    let org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    let _org_id = dispatcher.create_organization(org_name, org_address, org_mission);
     stop_cheat_caller_address(admin_address);
 
     // Create project with zero budget
@@ -770,3 +770,124 @@ fn test_get_project_remaining_budget_invalid_project() {
     // Try to get remaining budget for a non-existent project
     dispatcher.get_project_remaining_budget(999);
 }
+
+#[test]
+fn test_get_project_transactions() {
+    let (contract_address, admin_address, _org_address, _project_owner, project_id, _total_budget) =
+        setup_project_with_milestones();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+
+    // Create transactions
+    dispatcher
+        .create_transaction(project_id, recipient, 1000_u128, 'TEST', 'transaction1')
+        .unwrap();
+    dispatcher
+        .create_transaction(project_id, recipient, 2000_u128, 'TEST2', 'transaction2')
+        .unwrap();
+    dispatcher
+        .create_transaction(project_id, recipient, 3000_u128, 'TEST3', 'transaction3')
+        .unwrap();
+
+    let count = dispatcher.get_transaction_count();
+    assert(count == 3, 'Transaction count should be 3');
+
+    // Test page 1, page_size 2
+    let result = dispatcher.get_project_transactions(project_id, 1, 2);
+    assert(result.is_ok(), 'Page 1 should succeed');
+    let (transactions, total) = result.unwrap();
+    assert(total == 3, 'Total transactions should be 3');
+    assert(*transactions.at(0).amount == 1000_u128, 'Tx1 amount mismatch');
+    assert(*transactions.at(1).amount == 2000_u128, 'Tx2 amount mismatch');
+
+    // Test page 2, page_size 2
+    let result = dispatcher.get_project_transactions(project_id, 2, 2);
+    assert(result.is_ok(), 'Page 2 should succeed');
+    let (transactions, total) = result.unwrap();
+    assert(total == 3, 'Total transactions should be 3');
+    assert(*transactions.at(0).amount == 3000_u128, 'Tx3 amount mismatch');
+
+    stop_cheat_caller_address(admin_address);
+}
+
+#[test]
+fn test_get_project_transactions_single_transaction() {
+    let (contract_address, admin_address, _org_address, _project_owner, project_id, _total_budget) =
+        setup_project_with_milestones();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
+
+    // Seed one transaction
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_transaction(project_id, recipient, 100_u128, 'CAT', 'Tx1').unwrap();
+    stop_cheat_caller_address(admin_address);
+
+    // Test page 1, page_size 10 (larger than total)
+    let result = dispatcher.get_project_transactions(project_id, 1, 10);
+    assert(result.is_ok(), 'Expected success');
+    let (transactions, total) = result.unwrap();
+    assert(total == 1, 'Total should be 1');
+    assert(transactions.len() == 1, 'Should return 1 transaction');
+    assert(*transactions.at(0).amount == 100_u128, 'Tx amount mismatch');
+}
+
+#[test]
+#[should_panic(expected: 'ERROR_INVALID_PAGE_SIZE')]
+fn test_get_project_transactions_invalid_page_size() {
+    let (
+        contract_address, _admin_address, _org_address, _project_owner, project_id, _total_budget,
+    ) =
+        setup_project_with_milestones();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    dispatcher.get_project_transactions(project_id, 1, 0);
+}
+// #[test]
+// #[should_panic(expected: 'ERROR_INVALID_PAGE')]
+// fn test_get_project_transactions_invalid_page_zero() {
+//     let (
+//         contract_address, _admin_address, _org_address, _project_owner, project_id,
+//         _total_budget,
+//     ) =
+//         setup_project_with_milestones();
+//     let dispatcher = IBudgetDispatcher { contract_address };
+
+//     // Test with page = 0
+//     dispatcher.get_project_transactions(project_id, 0, 1);
+// }
+
+// #[test]
+// #[should_panic(expected: 'ERROR_NO_TRANSACTIONS')]
+// fn test_get_project_transactions_no_transactions() {
+//     let (
+//         contract_address, _admin_address, _org_address, _project_owner, project_id,
+//         _total_budget,
+//     ) =
+//         setup_project_with_milestones();
+//     let dispatcher = IBudgetDispatcher { contract_address };
+
+//     // No transactions seeded
+//     dispatcher.get_project_transactions(project_id, 1, 1);
+// }
+
+// #[test]
+// #[should_panic(expected: 'ERROR_INVALID_PAGE')]
+// fn test_get_project_transactions_page_beyond_total() {
+//     let (contract_address, admin_address, _org_address, _project_owner, project_id,
+//     _total_budget) =
+//         setup_project_with_milestones();
+//     let dispatcher = IBudgetDispatcher { contract_address };
+//     let recipient = contract_address_const::<'recipient'>();
+
+//     // Seed one transaction
+//     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+//     dispatcher.create_transaction(project_id, recipient, 100_u128, 'CAT', 'Tx1').unwrap();
+//     stop_cheat_caller_address(admin_address);
+
+//     // Test page 2 with only 1 transaction
+//     dispatcher.get_project_transactions(project_id, 2, 1);
+// }
+
+
