@@ -163,67 +163,14 @@ pub mod Budget {
 
     #[abi(embed_v0)]
     impl BudgetImpl of IBudget<ContractState> {
-        fn create_transaction(
-            ref self: ContractState,
-            project_id: u64,
-            recipient: ContractAddress,
-            amount: u128,
-            category: felt252,
-            description: felt252,
-        ) -> Result<u64, felt252> {
-            // Validate inputs
-            assert(recipient != contract_address_const::<0>(), ERROR_ZERO_ADDRESS);
-            assert(amount > 0, ERROR_ZERO_AMOUNT);
-
-            // Get caller address
-            let sender = get_caller_address();
-
-            // Get current timestamp
-            let timestamp = get_block_timestamp();
-
-            // Get next transaction ID
-            let transaction_id = self.transaction_count.read() + 1;
-
-            // Create the transaction
-            let transaction = Transaction {
-                id: transaction_id,
-                project_id,
-                sender,
-                recipient,
-                amount,
-                timestamp,
-                category,
-                description,
-            };
-
-            // Store transaction in contract storage
-            self.transactions.write(transaction_id, transaction);
-
-            // Store transaction ID in the all_transaction_ids mapping
-            self.all_transaction_ids.write(transaction_id - 1, transaction_id);
-
-            // Store transaction in the all_transactions Vec
-            self.all_transactions.append().write(transaction);
-
-            // Update transaction count
-            self.transaction_count.write(transaction_id);
-
-            // Emit the TransactionCreated event
-            self
-                .emit(
-                    TransactionCreated {
-                        id: transaction_id.into(),
-                        sender: sender,
-                        recipient: recipient,
-                        amount: amount,
-                        timestamp: timestamp,
-                        category: category,
-                        description: description,
-                    },
-                );
-
-            Result::Ok(transaction_id)
-        }
+        // fn create_transaction(
+        //     ref self: ContractState,
+        //     project_id: u64,
+        //     recipient: ContractAddress,
+        //     amount: u128,
+        //     category: felt252,
+        //     description: felt252,
+        // ) -> Result<u64, felt252> {}
 
         fn get_transaction(self: @ContractState, id: u64) -> Result<Transaction, felt252> {
             assert(id > 0 && id <= self.transaction_count.read(), ERROR_INVALID_TRANSACTION_ID);
@@ -236,100 +183,15 @@ pub mod Budget {
             self.transaction_count.read()
         }
 
-        fn get_transaction_history(
-            self: @ContractState, page: u64, page_size: u64,
-        ) -> Result<Array<Transaction>, felt252> {
-            // Validate page and page_size
-            if page == 0 {
-                return Result::Err(ERROR_INVALID_PAGE);
-            }
-
-            if page_size == 0 || page_size > 100 {
-                return Result::Err(ERROR_INVALID_PAGE_SIZE);
-            }
-
-            // Create array to hold dummy transaction data
-            let mut transactions_array = ArrayTrait::new();
-
-            // For demonstration, we'll create a few dummy transactions
-            let mut i: u64 = 0;
-            let transaction_count = if page_size < 5 {
-                page_size
-            } else {
-                5
-            };
-
-            while i < transaction_count {
-                let tx_id = (page - 1) * page_size + i + 1;
-
-                let dummy_tx = Transaction {
-                    id: tx_id,
-                    project_id: tx_id,
-                    sender: get_caller_address(),
-                    recipient: get_caller_address(),
-                    amount: (tx_id * 100).into(),
-                    timestamp: 0,
-                    category: 'DUMMY',
-                    description: 'Dummy transaction',
-                };
-
-                transactions_array.append(dummy_tx);
-                i += 1;
-            };
-
-            Result::Ok(transactions_array)
-        }
+        // fn get_transaction_history(
+        //     self: @ContractState, page: u64, page_size: u64,
+        // ) -> Result<Array<Transaction>, felt252> {}
 
         // New function: Get all transactions for a specific project
-        fn get_project_transactions(
-            self: @ContractState, project_id: u64, page: u64, page_size: u64,
-        ) -> Result<(Array<Transaction>, u64), felt252> {
-            if page_size == 0 {
-                return Result::Err(ERROR_INVALID_PAGE_SIZE);
-            }
-            if page == 0 {
-                return Result::Err(ERROR_INVALID_PAGE);
-            }
-
-            let mut transactions_array = ArrayTrait::new();
-            let total_tx_count: u64 = self.transaction_count.read();
-
-            let mut i: u64 = 0;
-            while i < total_tx_count {
-                let transaction_id = self.all_transaction_ids.read(i);
-                let transaction = self.transactions.read(transaction_id);
-
-                if transaction.project_id == project_id {
-                    transactions_array.append(transaction);
-                }
-                i += 1;
-            };
-
-            if transactions_array.len() == 0 {
-                return Result::Err(ERROR_NO_TRANSACTIONS);
-            }
-
-            let start_index = (page - 1) * page_size;
-            let end_index = start_index + page_size;
-            let total_transactions: u64 = transactions_array.len().into();
-
-            if start_index >= total_transactions {
-                return Result::Err(ERROR_INVALID_PAGE);
-            }
-
-            let mut paginated_transactions = ArrayTrait::<Transaction>::new();
-            let mut j: u64 = start_index;
-
-            while j < end_index && j < total_transactions {
-                if let Option::Some(boxed_tx) = transactions_array.get(j.try_into().unwrap()) {
-                    let transaction: Transaction = *boxed_tx.unbox();
-                    paginated_transactions.append(transaction);
-                }
-                j += 1;
-            };
-
-            Result::Ok((paginated_transactions, total_transactions.into()))
-        }
+        // fn get_project_transactions(
+        //     self: @ContractState, project_id: u64, page: u64, page_size: u64,
+        // ) -> Result<(Array<Transaction>, u64), felt252> {
+        // }
 
         // Retrieves all fund requests for a given project ID.
         fn get_fund_requests(self: @ContractState, project_id: u64) -> Array<FundRequest> {
@@ -722,31 +584,12 @@ pub mod Budget {
         fn get_milestone(self: @ContractState, project_id: u64, milestone_id: u64) -> Milestone {
             self.milestones.read((project_id, milestone_id))
         }
-        fn request_funds(
-            ref self: ContractState,
-            requester: ContractAddress,
-            project_id: u64,
-            milestone_id: u64,
-            request_id: u64,
-        ) -> u64 {
-            self.check_owner(requester, project_id);
-            self.check_milestone(requester, project_id, milestone_id);
-            self.funds_released(project_id, milestone_id);
-
-            // 3. Create a new fund request
-            // Increment the fund request counter to generate a unique ID
-            self.write_fund_request(requester, project_id, milestone_id, request_id);
-
-            let request_id = self.get_fund_requests_counter();
-            self.set_fund_requests_counter(request_id);
-
-            // Mark funds as requested (but not yet released)
-            self.milestone_funds_released.write((project_id, milestone_id), true);
-
-            let funds_requested_event = FundsRequested { project_id, request_id, milestone_id };
-            self.emit(Event::FundsRequested(funds_requested_event));
-
-            request_id
-        }
+        // fn request_funds(
+    //     ref self: ContractState,
+    //     requester: ContractAddress,
+    //     project_id: u64,
+    //     milestone_id: u64,
+    //     request_id: u64,
+    // ) -> u64 { }
     }
 }
