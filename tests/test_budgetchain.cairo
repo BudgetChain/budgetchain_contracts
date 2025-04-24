@@ -923,3 +923,80 @@ fn test_get_project_budget_multiple_releases() {
         'Final budget wrong',
     );
 }
+
+#[test]
+fn test_get_project_budget_after_fund_release() {
+    // Setup project with milestones
+    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create milestone by admin (replaces the default milestone)
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+
+    // Create milestone 1 (400 tokens)
+    let milestone1_amount: u256 = 400;
+    let milestone1_id = budget_dispatcher
+        .create_milestone(org_address, project_id, 'Milestone 1', milestone1_amount);
+
+    stop_cheat_caller_address(admin_address);
+
+    // Mark milestone as complete
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    budget_dispatcher.set_milestone_complete(project_id, milestone1_id);
+    stop_cheat_caller_address(project_owner);
+
+    // Create fund request
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    let request_id = budget_dispatcher.create_fund_request(project_id, milestone1_id);
+    stop_cheat_caller_address(project_owner);
+
+    // Release funds for the milestone
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    budget_dispatcher.release_funds(org_address, project_id, request_id);
+    stop_cheat_caller_address(org_address);
+
+    // Test that remaining budget is updated after fund release
+    let remaining_budget = budget_dispatcher.get_project_budget(project_id);
+    assert(remaining_budget == total_budget - milestone1_amount, 'Budget after release wrong');
+}
+
+#[test]
+fn test_get_project_budget_after_milestone_creation() {
+    // Setup project with milestones
+    let (contract_address, admin_address, org_address, _project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create additional milestones by admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+
+    // Create milestone 1 (400 tokens)
+    let milestone1_amount: u256 = 400;
+    budget_dispatcher.create_milestone(org_address, project_id, 'Milestone 1', milestone1_amount);
+
+    // Create milestone 2 (300 tokens)
+    let milestone2_amount: u256 = 300;
+    budget_dispatcher.create_milestone(org_address, project_id, 'Milestone 2', milestone2_amount);
+
+    stop_cheat_caller_address(admin_address);
+
+    // Test that creating milestones doesn't affect remaining budget
+    let remaining_budget = budget_dispatcher.get_project_budget(project_id);
+    assert(remaining_budget == total_budget, 'Creation changes budget');
+}
+
+#[test]
+fn test_get_project_budget_initial() {
+    // Setup project with milestones
+    let (contract_address, _admin_address, _org_address, _project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+
+    // Test that initial remaining budget equals total budget
+    let remaining_budget = budget_dispatcher.get_project_budget(project_id);
+    assert(remaining_budget == total_budget, 'Initial budget incorrect');
+}
