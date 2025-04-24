@@ -894,7 +894,8 @@ fn test_get_project_budget_multiple_releases() {
     stop_cheat_caller_address(org_address);
 
     // Check intermediate budget
-    let remaining_budget_after_first_release = budget_dispatcher.get_project_remaining_budget(project_id);
+    let remaining_budget_after_first_release = budget_dispatcher
+        .get_project_remaining_budget(project_id);
     assert(
         remaining_budget_after_first_release == total_budget - milestone1_amount,
         'First release budget wrong',
