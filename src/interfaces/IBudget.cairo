@@ -23,6 +23,7 @@ pub trait IBudget<TContractState> {
     // Project Management
     fn get_project(self: @TContractState, project_id: u64) -> Project;
     fn get_project_remaining_budget(self: @TContractState, project_id: u64) -> u256;
+    fn get_project_budget( self: @TContractState, project_id: u64) -> u256;
     // fn get_project_transactions(
     //     self: @TContractState, project_id: u64, page: u64, page_size: u64,
     // ) -> Result<(Array<Transaction>, u64), felt252>;
