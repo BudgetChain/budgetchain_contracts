@@ -33,6 +33,9 @@ pub mod Budget {
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
         org_list: Array<Organization>,
+        // Double map for project transaction IDs
+        project_transaction_ids: Map<(u64, u64), u64>, // (project_id, index) -> transaction_id
+        project_transaction_count: Map<u64, u64> // project_id -> count
     }
 
 
@@ -106,8 +109,29 @@ pub mod Budget {
             category: felt252,
             description: felt252,
         ) -> Result<u64, felt252> {
-            // Simple implementation that just returns a dummy ID
-            Result::Ok(1)
+            // Generate new transaction ID
+            let tx_id = self.transaction_count.read();
+            let sender = get_caller_address();
+            let timestamp = get_block_timestamp();
+            let transaction = Transaction {
+                id: tx_id,
+                sender: sender,
+                recipient: recipient,
+                amount: amount,
+                timestamp: timestamp,
+                category: category,
+                description: description,
+            };
+            self.transactions.write(tx_id, transaction);
+            self.transaction_count.write(tx_id + 1);
+
+            // Use category as project_id
+            let project_id: u64 = category.try_into().unwrap();
+            let count = self.project_transaction_count.read(project_id);
+            self.project_transaction_ids.write((project_id, count), tx_id);
+            self.project_transaction_count.write(project_id, count + 1);
+
+            Result::Ok(tx_id)
         }
 
         fn get_transaction(self: @ContractState, id: u64) -> Result<Transaction, felt252> {
@@ -311,6 +335,45 @@ pub mod Budget {
         fn get_organization(self: @ContractState, org_id: u256) -> Organization {
             let organization = self.organizations.read(org_id);
             organization
+        }
+
+        /// @notice Retrieves a paginated list of transactions for a specific project.
+        /// @param project_id The ID of the project whose transactions are to be retrieved.
+        /// @param page The page number (1-based).
+        /// @param page_size The number of transactions per page (max 100).
+        /// @return Result<(Array<Transaction>, u64), felt252> A tuple containing the paginated
+        /// transactions and the total count, or an error code.
+        fn get_project_transactions(
+            self: @ContractState, project_id: u64, page: u64, page_size: u64,
+        ) -> Result<(Array<Transaction>, u64), felt252> {
+            if page == 0 {
+                return Result::Err(ERROR_INVALID_PAGE);
+            }
+            if page_size == 0 || page_size > 100 {
+                return Result::Err(ERROR_INVALID_PAGE_SIZE);
+            }
+            let total = self.project_transaction_count.read(project_id);
+            if total == 0 {
+                return Result::Err(ERROR_NO_TRANSACTIONS);
+            }
+            let start = (page - 1) * page_size;
+            if start >= total {
+                return Result::Ok((ArrayTrait::new(), total));
+            }
+            let end = if start + page_size > total {
+                total
+            } else {
+                start + page_size
+            };
+            let mut txs = ArrayTrait::new();
+            let mut i = start;
+            while i < end {
+                let tx_id = self.project_transaction_ids.read((project_id, i));
+                let tx = self.transactions.read(tx_id);
+                txs.append(tx);
+                i += 1;
+            };
+            Result::Ok((txs, total))
         }
     }
 }
