@@ -1,4 +1,4 @@
-use budgetchain_contracts::base::types::{Transaction};
+use budgetchain_contracts::base::types::Transaction;
 use budgetchain_contracts::budgetchain::Budget;
 use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
 use snforge_std::{
@@ -549,7 +549,7 @@ fn test__return_funds() {
 
 #[test]
 #[should_panic(expected: 'Amount cannot be zero')]
-fn test_zero_amount(){
+fn test_zero_amount() {
     let (contract_address, admin_address) = setup();
 
     let org_address = contract_address_const::<'Organization'>();
@@ -557,14 +557,13 @@ fn test_zero_amount(){
 
     let dispatcher = IBudgetDispatcher { contract_address };
 
-
-        start_cheat_caller_address(contract_address, proj_owner);
+    start_cheat_caller_address(contract_address, proj_owner);
     dispatcher.return_funds(proj_owner, 19, 0);
 }
 
 #[test]
 #[should_panic(expected: 'Amount cannot be zero')]
-fn test_refund_transaction_count(){
+fn test_refund_transaction_count() {
     let (contract_address, admin_address) = setup();
 
     let org_address = contract_address_const::<'Organization'>();
@@ -573,13 +572,10 @@ fn test_refund_transaction_count(){
     let dispatcher = IBudgetDispatcher { contract_address };
     let count = dispatcher.get_transaction_count();
     assert(count == 0, 'incorrect deployment');
-    
-  
-        start_cheat_caller_address(contract_address, proj_owner);
+
+    start_cheat_caller_address(contract_address, proj_owner);
     dispatcher.return_funds(proj_owner, 17, 0);
     assert(count == 1, 'An error occured');
-
-
 }
 
 #[test]
