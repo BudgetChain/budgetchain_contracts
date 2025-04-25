@@ -88,4 +88,8 @@ pub trait IBudget<TContractState> {
     fn check_owner(self: @TContractState, requester: ContractAddress, project_id: u64);
     fn set_fund_requests_counter(ref self: TContractState, value: u64) -> bool;
     fn get_fund_requests_counter(self: @TContractState) -> u64;
+
+    fn pause_contract(ref self: TContractState);
+    fn unpause_contract(ref self: TContractState);
+    fn is_paused(self: @TContractState) -> bool;
 }

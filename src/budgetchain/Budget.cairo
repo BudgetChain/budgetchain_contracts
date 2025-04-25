@@ -62,6 +62,7 @@ pub mod Budget {
         milestone_funds_released: LegacyMap<(u64, u64), bool>,
         project_owners: LegacyMap<u64, ContractAddress>,
         milestone_statuses: LegacyMap<(u64, u64), bool>,
+        is_paused: bool,
     }
 
 
@@ -170,7 +171,10 @@ pub mod Budget {
         //     amount: u128,
         //     category: felt252,
         //     description: felt252,
-        // ) -> Result<u64, felt252> {}
+        // ) -> Result<u64, felt252> {
+
+        //     // Ensure the contract is not paused
+        //     self.assert_not_paused();}
 
         fn get_transaction(self: @ContractState, id: u64) -> Result<Transaction, felt252> {
             assert(id > 0 && id <= self.transaction_count.read(), ERROR_INVALID_TRANSACTION_ID);
@@ -243,6 +247,9 @@ pub mod Budget {
             milestone_descriptions: Array<felt252>,
             milestone_amounts: Array<u256>,
         ) -> u64 {
+            // Ensure the contract is not paused
+            self.assert_not_paused();
+
             let caller = get_caller_address();
             assert(self.org_addresses.entry(org).read(), ERROR_UNAUTHORIZED);
             assert(caller == org, ERROR_CALLER_NOT_ORG);
@@ -465,6 +472,8 @@ pub mod Budget {
         fn release_funds(
             ref self: ContractState, org: ContractAddress, project_id: u64, request_id: u64,
         ) {
+            // Ensure the contract is not paused
+            self.assert_not_paused();
             // Verify caller is an authorized organization
             self.accesscontrol.assert_only_role(ORGANIZATION_ROLE);
 
@@ -593,12 +602,46 @@ pub mod Budget {
         fn get_milestone(self: @ContractState, project_id: u64, milestone_id: u64) -> Milestone {
             self.milestones.read((project_id, milestone_id))
         }
+        fn pause_contract(ref self: ContractState) {
+            // Ensure only the admin can pause the contract
+            let caller = get_caller_address();
+            assert(caller == self.admin.read(), ERROR_ONLY_ADMIN);
+            // check if already paused
+            assert(!self.is_paused.read(), ERROR_ALREADY_PAUSED);
+            // Set the paused state to true
+            self.is_paused.write(true);
+        }
+        fn unpause_contract(ref self: ContractState) {
+            // Ensure only the admin can unpause the contract
+            let caller = get_caller_address();
+            assert(caller == self.admin.read(), ERROR_ONLY_ADMIN);
+
+            // Set the paused state to false
+            self.is_paused.write(false);
+        }
+        fn is_paused(self: @ContractState) -> bool {
+            self.is_paused.read()
+        }
         // fn request_funds(
     //     ref self: ContractState,
     //     requester: ContractAddress,
     //     project_id: u64,
     //     milestone_id: u64,
     //     request_id: u64,
-    // ) -> u64 { }
+    // ) -> u64 {
+    // Ensure the contract is not paused
+    // self.assert_not_paused();
+
+        //  }
+    }
+
+    #[generate_trait]
+    pub impl Internal of InternalTrait {
+        // Internal view function
+        // - Takes `@self` as it only needs to read state
+        // - Can only be called by other functions within the contract
+        fn assert_not_paused(self: @ContractState) {
+            assert(!self.is_paused.read(), ERROR_CONTRACT_PAUSED);
+        }
     }
 }
