@@ -804,18 +804,6 @@ fn test_pause_contract() {
 #[test]
 #[should_panic(expected: 'ONLY ADMIN')]
 fn test_pause_contract_should_panic_if_non_admin() {
-=======
-#[should_panic(expected: 'Invalid project ID')]
-fn test_get_project_budget_invalid_project() {
-    let (contract_address, _) = setup();
-    let dispatcher = IBudgetDispatcher { contract_address };
-
-    // Try to get budget for a non-existent project
-    dispatcher.get_project_budget(999);
-}
-
-#[test]
-fn test_get_project_budget_full_utilization() {
     // Setup project with milestones
     let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
         setup_project_with_milestones();
@@ -826,11 +814,6 @@ fn test_get_project_budget_full_utilization() {
     // Create one milestone for the full budget
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
     let milestone_id = dispatcher
-    let budget_dispatcher = IBudgetDispatcher { contract_address };
-
-    // Create one milestone for the full budget
-    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    let milestone_id = budget_dispatcher
         .create_milestone(org_address, project_id, 'Full Budget Milestone', total_budget);
     stop_cheat_caller_address(admin_address);
 
@@ -886,6 +869,146 @@ fn test_pause_contract_should_panic_if_already_paused() {
 
 #[test]
 fn test_unpause_contract() {
+    // Setup project with milestones
+    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create one milestone for the full budget
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let milestone_id = dispatcher
+        .create_milestone(org_address, project_id, 'Full Budget Milestone', total_budget);
+    stop_cheat_caller_address(admin_address);
+
+    // Mark milestone as complete
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    stop_cheat_caller_address(project_owner);
+
+    // pause contract
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.pause_contract();
+    stop_cheat_caller_address(admin_address);
+
+    // assert contract was paused
+    let is_paused = dispatcher.is_paused();
+    assert(is_paused == true, 'Contract should be paused');
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.unpause_contract();
+    stop_cheat_caller_address(admin_address);
+
+    // assert contract was unpaused
+    let is_paused = dispatcher.is_paused();
+    assert(is_paused == false, 'Contract should not be paused');
+}
+
+
+#[test]
+#[should_panic(expected: 'ONLY ADMIN')]
+fn test_unpause_contract_should_panic_if_not_admin() {
+    // Setup project with milestones
+    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let another_user = contract_address_const::<'ProjectOwner'>();
+
+    // Create one milestone for the full budget
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let milestone_id = dispatcher
+        .create_milestone(org_address, project_id, 'Full Budget Milestone', total_budget);
+    stop_cheat_caller_address(admin_address);
+
+    // Mark milestone as complete
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    stop_cheat_caller_address(project_owner);
+
+    // pause contract
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.pause_contract();
+    stop_cheat_caller_address(admin_address);
+
+    // assert contract was paused
+    let is_paused = dispatcher.is_paused();
+    assert(is_paused == true, 'Contract should be paused');
+
+    cheat_caller_address(contract_address, another_user, CheatSpan::Indefinite);
+    dispatcher.unpause_contract();
+    stop_cheat_caller_address(admin_address);
+}
+
+
+#[test]
+#[should_panic(expected: 'Contract is paused')]
+fn test_functions_should_panic_when_contract_is_done() {
+    // Setup project with no budget
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create organization
+    let org_name = 'Test Org';
+    let org_address = contract_address_const::<'Organization'>();
+    let org_mission = 'Testing Budget Chain';
+
+    // Create project owner
+    let project_owner = contract_address_const::<'ProjectOwner'>();
+
+    // Set admin as caller to create organization
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let _org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Create project with zero budget
+    let total_budget: u256 = 0;
+
+    // Set milestone descriptions and amounts
+    let mut milestone_descriptions = array!['Empty Milestone'];
+    let mut milestone_amounts = array![total_budget];
+
+    // pause contract
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.pause_contract();
+    stop_cheat_caller_address(admin_address);
+
+    // Set org_address as caller to create project
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    dispatcher
+        .allocate_project_budget(
+            org_address, project_owner, total_budget, milestone_descriptions, milestone_amounts,
+        );
+    stop_cheat_caller_address(org_address);
+}
+
+
+#[test]
+#[should_panic(expected: 'Invalid project ID')]
+fn test_get_project_budget_invalid_project() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Try to get budget for a non-existent project
+    dispatcher.get_project_budget(999);
+}
+
+#[test]
+fn test_get_project_budget_full_utilization() {
+    // Setup project with milestones
+    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create one milestone for the full budget
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let milestone_id = budget_dispatcher
+        .create_milestone(org_address, project_id, 'Full Budget Milestone', total_budget);
+    stop_cheat_caller_address(admin_address);
+
+    // Mark milestone as complete
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
     budget_dispatcher.set_milestone_complete(project_id, milestone_id);
     stop_cheat_caller_address(project_owner);
 
@@ -949,41 +1072,6 @@ fn test_get_project_budget_multiple_releases() {
     let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
         setup_project_with_milestones();
 
-    let dispatcher = IBudgetDispatcher { contract_address };
-
-    // Create one milestone for the full budget
-    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    let milestone_id = dispatcher
-        .create_milestone(org_address, project_id, 'Full Budget Milestone', total_budget);
-    stop_cheat_caller_address(admin_address);
-
-    // Mark milestone as complete
-    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
-    dispatcher.set_milestone_complete(project_id, milestone_id);
-    stop_cheat_caller_address(project_owner);
-
-    // pause contract
-    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    dispatcher.pause_contract();
-    stop_cheat_caller_address(admin_address);
-
-    // assert contract was paused
-    let is_paused = dispatcher.is_paused();
-    assert(is_paused == true, 'Contract should be paused');
-
-    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    dispatcher.unpause_contract();
-    stop_cheat_caller_address(admin_address);
-
-    // assert contract was unpaused
-    let is_paused = dispatcher.is_paused();
-    assert(is_paused == false, 'Contract should not be paused');
-}
-
-
-#[test]
-#[should_panic(expected: 'ONLY ADMIN')]
-fn test_unpause_contract_should_panic_if_not_admin() {
     let budget_dispatcher = IBudgetDispatcher { contract_address };
 
     // Create milestones by admin
@@ -1055,13 +1143,6 @@ fn test_get_project_budget_after_fund_release() {
     let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
         setup_project_with_milestones();
 
-    let dispatcher = IBudgetDispatcher { contract_address };
-    let another_user = contract_address_const::<'ProjectOwner'>();
-
-    // Create one milestone for the full budget
-    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    let milestone_id = dispatcher
-        .create_milestone(org_address, project_id, 'Full Budget Milestone', total_budget);
     let budget_dispatcher = IBudgetDispatcher { contract_address };
 
     // Create milestone by admin (replaces the default milestone)
@@ -1076,63 +1157,6 @@ fn test_get_project_budget_after_fund_release() {
 
     // Mark milestone as complete
     cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
-    dispatcher.set_milestone_complete(project_id, milestone_id);
-    stop_cheat_caller_address(project_owner);
-
-    // pause contract
-    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    dispatcher.pause_contract();
-    stop_cheat_caller_address(admin_address);
-
-    // assert contract was paused
-    let is_paused = dispatcher.is_paused();
-    assert(is_paused == true, 'Contract should be paused');
-
-    cheat_caller_address(contract_address, another_user, CheatSpan::Indefinite);
-    dispatcher.unpause_contract();
-    stop_cheat_caller_address(admin_address);
-}
-
-
-#[test]
-#[should_panic(expected: 'Contract is paused')]
-fn test_functions_should_panic_when_contract_is_done() {
-    // Setup project with no budget
-    let (contract_address, admin_address) = setup();
-    let dispatcher = IBudgetDispatcher { contract_address };
-
-    // Create organization
-    let org_name = 'Test Org';
-    let org_address = contract_address_const::<'Organization'>();
-    let org_mission = 'Testing Budget Chain';
-
-    // Create project owner
-    let project_owner = contract_address_const::<'ProjectOwner'>();
-
-    // Set admin as caller to create organization
-    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    let _org_id = dispatcher.create_organization(org_name, org_address, org_mission);
-    stop_cheat_caller_address(admin_address);
-
-    // Create project with zero budget
-    let total_budget: u256 = 0;
-
-    // Set milestone descriptions and amounts
-    let mut milestone_descriptions = array!['Empty Milestone'];
-    let mut milestone_amounts = array![total_budget];
-
-    // pause contract
-    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    dispatcher.pause_contract();
-    stop_cheat_caller_address(admin_address);
-
-    // Set org_address as caller to create project
-    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
-    dispatcher
-        .allocate_project_budget(
-            org_address, project_owner, total_budget, milestone_descriptions, milestone_amounts,
-        );
-    stop_cheat_caller_address(org_address);
     budget_dispatcher.set_milestone_complete(project_id, milestone1_id);
     stop_cheat_caller_address(project_owner);
 
