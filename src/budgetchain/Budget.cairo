@@ -37,6 +37,7 @@ pub mod Budget {
     struct Storage {
         admin: ContractAddress,
         // Transaction storage
+        owner: ContractAddress,
         transaction_count: u64,
         transactions: Map<u64, Transaction>,
         project_count: u64,
@@ -80,6 +81,7 @@ pub mod Budget {
         #[flat]
         SRC5Event: SRC5Component::Event,
         FundsRequested: FundsRequested,
+        FundsReturned: FundsReturned,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -115,6 +117,13 @@ pub mod Budget {
         pub id: u256,
         pub address: ContractAddress,
         pub name: felt252,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct FundsReturned {
+        pub project_id: u64,
+        pub amount: u256,
+        pub project_owner: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -212,6 +221,55 @@ pub mod Budget {
 
             fund_requests_to_return
         }
+
+        fn return_funds(
+            ref self: ContractState, project_owner: ContractAddress, project_id: u64, amount: u256
+        ) {
+            assert(project_id != 0, 'Invalid project ID');
+            assert(amount > 0, 'Amount cannot be zero');
+
+            let get_project_by_id = self.projects.read(project_id);
+            assert(get_project_by_id.owner == project_owner, ERROR_UNAUTHORIZED);
+
+            // Verify that the project has enough remaining budget
+            assert(get_project_by_id.total_budget >= amount, ERROR_INSUFFICIENT_BUDGET);
+
+            // Update the project's remaining budget
+            let new_budget = get_project_by_id.total_budget - amount;
+            let updated_project = Project {
+                id: get_project_by_id.id,
+                org: get_project_by_id.org,
+                owner: get_project_by_id.owner,
+                total_budget: new_budget,
+            };
+            self.projects.write(project_id, updated_project);
+
+            let transaction_id = self.transaction_count.read() + 1;
+            let transaction = Transaction {
+                id: transaction_id,
+                project_id,
+                sender: project_owner,
+                recipient: get_project_by_id.org,
+                amount: amount.try_into().unwrap(),
+                timestamp: get_block_timestamp(),
+                category: 'FUNDS_RETURNED',
+                description: 'Unused project funds returned',
+            };
+
+            // Create transaction record for the returned funds
+            // Save transaction to transaction history
+            self.all_transactions.append().write(transaction);
+
+            // Save transaction ID to project transaction IDs
+            self.project_transaction_ids.entry(project_id).append().write(transaction_id);
+
+            // Update transaction counter
+            self.transaction_count.write(transaction_id);
+
+            // Emit the FundsReturned event
+            self.emit(Event::FundsReturned(FundsReturned { project_id, amount, project_owner }));
+        }
+
 
         fn get_admin(self: @ContractState) -> ContractAddress {
             self.admin.read()
