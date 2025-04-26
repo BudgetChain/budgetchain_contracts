@@ -750,7 +750,7 @@ fn test_get_project_remaining_budget_with_wrong_budget_update() {
 }
 
 #[test]
-fn test_successful_request_funds(){
+fn test_successful_request_funds() {
     // Setup addresses
     let admin = ADMIN();
     let org = ORGANIZATION();
@@ -788,12 +788,11 @@ fn test_successful_request_funds(){
     // third assertion
     let request = dispatcher.get_fund_request(project_id, request_id);
     assert(request.status == FundRequestStatus::Pending, 'Request should be pending');
-    
 }
 
 #[test]
 #[should_panic(expected: 'Only project owner can request')]
-fn test_unauthorize_caller_request_funds(){
+fn test_unauthorize_caller_request_funds() {
     // Setup addresses
     let admin = ADMIN();
     let org = ORGANIZATION();
@@ -827,7 +826,7 @@ fn test_unauthorize_caller_request_funds(){
 
 #[test]
 #[should_panic(expected: 'Funds already released')]
-fn test_is_fund_release_request_funds(){
+fn test_is_fund_release_request_funds() {
     // Setup addresses
     let admin = ADMIN();
     let org = ORGANIZATION();
@@ -859,13 +858,11 @@ fn test_is_fund_release_request_funds(){
     // Release funds as organization
     dispatcher.release_funds(org, project_id, request_id);
     dispatcher.request_funds(org, project_id, milestone_id, request_id);
-
-
 }
 
 #[test]
 #[should_panic(expected: 'Project milestone incomplete')]
-fn test_milestone_not_complete_request_funds(){
+fn test_milestone_not_complete_request_funds() {
     // Setup addresses
     let admin = ADMIN();
     let org = ORGANIZATION();
