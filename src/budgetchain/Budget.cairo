@@ -53,6 +53,7 @@ pub mod Budget {
         org_milestones: Map<ContractAddress, u64>, // org to number of milestones they have
         all_transactions: Vec<Transaction>,
         project_transaction_ids: Map<u64, Vec<u64>>,
+        project_transaction_count: Map<u64, u64>, // project_id -> count
         #[substorage(v0)]
         accesscontrol: AccessControlComponent::Storage,
         #[substorage(v0)]
@@ -164,17 +165,41 @@ pub mod Budget {
 
     #[abi(embed_v0)]
     impl BudgetImpl of IBudget<ContractState> {
-        // fn create_transaction(
-        //     ref self: ContractState,
-        //     project_id: u64,
-        //     recipient: ContractAddress,
-        //     amount: u128,
-        //     category: felt252,
-        //     description: felt252,
-        // ) -> Result<u64, felt252> {
+        fn create_transaction(
+            ref self: ContractState,
+            project_id: u64,
+            recipient: ContractAddress,
+            amount: u128,
+            category: felt252,
+            description: felt252,
+        ) -> Result<u64, felt252> {
+            // Ensure the contract is not paused
+            self.assert_not_paused();
 
-        //     // Ensure the contract is not paused
-        //     self.assert_not_paused();}
+            // Generate new transaction ID
+            let transaction_id = self.transaction_count.read();
+            let sender = get_caller_address();
+            let timestamp = get_block_timestamp();
+            let transaction = Transaction {
+                id: transaction_id,
+                project_id: project_id,
+                sender: sender,
+                recipient: recipient,
+                amount: amount,
+                timestamp: timestamp,
+                category: category,
+                description: description,
+            };
+            self.transactions.write(transaction_id, transaction);
+            self.transaction_count.write(transaction_id + 1);
+
+            // Use category as project_id
+            let count = self.project_transaction_count.read(project_id);
+            self.project_transaction_ids.entry(project_id).append().write(transaction_id);
+            self.project_transaction_count.write(project_id, count + 1);
+
+            Result::Ok(transaction_id)
+        }
 
         fn get_transaction(self: @ContractState, id: u64) -> Result<Transaction, felt252> {
             assert(id > 0 && id <= self.transaction_count.read(), ERROR_INVALID_TRANSACTION_ID);
@@ -623,16 +648,56 @@ pub mod Budget {
             self.is_paused.read()
         }
         // fn request_funds(
-    //     ref self: ContractState,
-    //     requester: ContractAddress,
-    //     project_id: u64,
-    //     milestone_id: u64,
-    //     request_id: u64,
-    // ) -> u64 {
-    // Ensure the contract is not paused
-    // self.assert_not_paused();
+        //     ref self: ContractState,
+        //     requester: ContractAddress,
+        //     project_id: u64,
+        //     milestone_id: u64,
+        //     request_id: u64,
+        // ) -> u64 {
+        // Ensure the contract is not paused
+        // self.assert_not_paused();
 
         //  }
+
+        /// @notice Retrieves a paginated list of transactions for a specific project.
+        /// @param project_id The ID of the project whose transactions are to be retrieved.
+        /// @param page The page number (1-based).
+        /// @param page_size The number of transactions per page (max 100).
+        /// @return Result<(Array<Transaction>, u64), felt252> A tuple containing the paginated
+        /// transactions and the total count, or an error code.
+        fn get_project_transactions(
+            self: @ContractState, project_id: u64, page: u64, page_size: u64,
+        ) -> Result<(Array<Transaction>, u64), felt252> {
+            if page == 0 {
+                return Result::Err(ERROR_INVALID_PAGE);
+            }
+            if page_size == 0 || page_size > 100 {
+                return Result::Err(ERROR_INVALID_PAGE_SIZE);
+            }
+            let total = self.project_transaction_count.read(project_id);
+            if total == 0 {
+                return Result::Err(ERROR_NO_TRANSACTIONS);
+            }
+            let start = (page - 1) * page_size;
+            if start >= total {
+                return Result::Ok((ArrayTrait::new(), total));
+            }
+            let end = if start + page_size > total {
+                total
+            } else {
+                start + page_size
+            };
+            let mut txs = ArrayTrait::new();
+
+            let mut i = start;
+            while i < end {
+                let tx_id = self.project_transaction_ids.entry(project_id).at(i).read();
+                let tx = self.transactions.read(tx_id);
+                txs.append(tx);
+                i += 1;
+            };
+            Result::Ok((txs, total))
+        }
     }
 
     #[generate_trait]

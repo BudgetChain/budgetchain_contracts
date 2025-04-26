@@ -6,14 +6,14 @@ use starknet::ContractAddress;
 #[starknet::interface]
 pub trait IBudget<TContractState> {
     // Transaction Management
-    // fn create_transaction(
-    //     ref self: TContractState,
-    //     project_id: u64,
-    //     recipient: ContractAddress,
-    //     amount: u128,
-    //     category: felt252,
-    //     description: felt252,
-    // ) -> Result<u64, felt252>;
+    fn create_transaction(
+        ref self: TContractState,
+        project_id: u64,
+        recipient: ContractAddress,
+        amount: u128,
+        category: felt252,
+        description: felt252,
+    ) -> Result<u64, felt252>;
     fn get_transaction(self: @TContractState, id: u64) -> Result<Transaction, felt252>;
     // fn get_transaction_history(
     //     self: @TContractState, page: u64, page_size: u64,
@@ -88,6 +88,9 @@ pub trait IBudget<TContractState> {
     fn check_owner(self: @TContractState, requester: ContractAddress, project_id: u64);
     fn set_fund_requests_counter(ref self: TContractState, value: u64) -> bool;
     fn get_fund_requests_counter(self: @TContractState) -> u64;
+    fn get_project_transactions(
+        self: @TContractState, project_id: u64, page: u64, page_size: u64,
+    ) -> Result<(Array<Transaction>, u64), felt252>;
 
     fn pause_contract(ref self: TContractState);
     fn unpause_contract(ref self: TContractState);
