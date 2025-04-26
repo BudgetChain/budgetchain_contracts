@@ -748,3 +748,144 @@ fn test_get_project_remaining_budget_with_wrong_budget_update() {
     let project = dispatcher.get_project(project_id);
     assert(project.total_budget == total_budget - amount + 100, 'Budget not updated correctly');
 }
+
+#[test]
+fn test_successful_request_funds() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Complete milestone and create a new fund request as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::Indefinite);
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+    //request for fund as a admin
+    dispatcher.request_funds(admin, project_id, milestone_id, request_id);
+    // Check fund request status should be pending by default
+    // first assertion
+    let request = dispatcher.get_fund_request(project_id, request_id);
+    assert(request.status == FundRequestStatus::Pending, 'Request should be pending');
+    // second assertion
+    let request = dispatcher.get_fund_request(project_id, request_id);
+    assert(request.status == FundRequestStatus::Pending, 'Request should be pending');
+    // third assertion
+    let request = dispatcher.get_fund_request(project_id, request_id);
+    assert(request.status == FundRequestStatus::Pending, 'Request should be pending');
+}
+
+#[test]
+#[should_panic(expected: 'Only project owner can request')]
+fn test_unauthorize_caller_request_funds() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+    let non_org = NON_ORG();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Complete milestone and create a new fund request as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(2));
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+
+    //request for fund as a non_org
+    dispatcher.request_funds(non_org, project_id, milestone_id, request_id);
+}
+
+#[test]
+#[should_panic(expected: 'Funds already released')]
+fn test_is_fund_release_request_funds() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // Complete milestone and create a new fund request as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(2));
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+
+    // Release funds as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(2));
+    // Release funds as organization
+    dispatcher.release_funds(org, project_id, request_id);
+    dispatcher.request_funds(org, project_id, milestone_id, request_id);
+}
+
+#[test]
+#[should_panic(expected: 'Project milestone incomplete')]
+fn test_milestone_not_complete_request_funds() {
+    // Setup addresses
+    let admin = ADMIN();
+    let org = ORGANIZATION();
+
+    // Deploy contract - now using updated function signature
+    let (contract_address, dispatcher) = deploy_budget_contract(admin);
+
+    // Setup test data via destructuring
+    let (milestone_id, total_budget, amount, description) = setup_test_data();
+
+    // Add organization as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(1));
+    dispatcher.create_organization('StarkCorp', org, 'Serenity Max');
+
+    // Create project as organization
+    cheat_caller_address(contract_address, org, CheatSpan::TargetCalls(1));
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org, admin, total_budget, array![description, description], array![amount, amount],
+        );
+
+    // create a new fund request as admin
+    cheat_caller_address(contract_address, admin, CheatSpan::TargetCalls(2));
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+    dispatcher.request_funds(org, project_id, milestone_id, request_id);
+}

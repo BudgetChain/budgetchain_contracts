@@ -67,13 +67,13 @@ pub trait IBudget<TContractState> {
 
     // Admin Management
     fn get_admin(self: @TContractState) -> ContractAddress;
-    // fn request_funds(
-    //     ref self: TContractState,
-    //     requester: ContractAddress,
-    //     project_id: u64,
-    //     milestone_id: u64,
-    //     request_id: u64,
-    // ) -> u64;
+    fn request_funds(
+        ref self: TContractState,
+        requester: ContractAddress,
+        project_id: u64,
+        milestone_id: u64,
+        request_id: u64,
+    ) -> u64;
     fn write_fund_request(
         ref self: TContractState,
         requester: ContractAddress,
