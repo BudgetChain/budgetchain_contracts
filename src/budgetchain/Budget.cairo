@@ -49,7 +49,7 @@ pub mod Budget {
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
         org_list: Array<Organization>,
-        milestones: Map<(u64, u64), Milestone>, // (project, milestone id) -> Milestone
+        milestones: Map<(u64, u64), Milestone>, // (project id, milestone id) -> Milestone
         org_milestones: Map<ContractAddress, u64>, // org to number of milestones they have
         all_transactions: Vec<Transaction>,
         project_transaction_ids: Map<u64, Vec<u64>>,
@@ -647,56 +647,73 @@ pub mod Budget {
         fn is_paused(self: @ContractState) -> bool {
             self.is_paused.read()
         }
-        // fn request_funds(
-        //     ref self: ContractState,
-        //     requester: ContractAddress,
-        //     project_id: u64,
-        //     milestone_id: u64,
-        //     request_id: u64,
-        // ) -> u64 {
-        // Ensure the contract is not paused
-        // self.assert_not_paused();
 
-        //  }
+        fn request_funds(
+            ref self: ContractState,
+            requester: ContractAddress,
+            project_id: u64,
+            milestone_id: u64,
+            request_id: u64,
+        ) -> u64 {
+            //Ensure the contract is not paused
+            self.assert_not_paused();
 
-        /// @notice Retrieves a paginated list of transactions for a specific project.
-        /// @param project_id The ID of the project whose transactions are to be retrieved.
-        /// @param page The page number (1-based).
-        /// @param page_size The number of transactions per page (max 100).
-        /// @return Result<(Array<Transaction>, u64), felt252> A tuple containing the paginated
-        /// transactions and the total count, or an error code.
-        fn get_project_transactions(
-            self: @ContractState, project_id: u64, page: u64, page_size: u64,
-        ) -> Result<(Array<Transaction>, u64), felt252> {
-            if page == 0 {
-                return Result::Err(ERROR_INVALID_PAGE);
-            }
-            if page_size == 0 || page_size > 100 {
-                return Result::Err(ERROR_INVALID_PAGE_SIZE);
-            }
-            let total = self.project_transaction_count.read(project_id);
-            if total == 0 {
-                return Result::Err(ERROR_NO_TRANSACTIONS);
-            }
-            let start = (page - 1) * page_size;
-            if start >= total {
-                return Result::Ok((ArrayTrait::new(), total));
-            }
-            let end = if start + page_size > total {
-                total
-            } else {
-                start + page_size
+            // Verify project exists
+            let project = self.projects.read(project_id);
+            assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
+
+            // Verify caller's authorization
+            // Caller must be either project org or admin
+            assert(
+                requester == self.admin.read() || requester == project.org,
+                ERROR_UNAUTHORIZED_REQUESTER,
+            );
+
+            // Verify milestone exists
+            let milestone = self.milestones.read((project_id, milestone_id));
+            assert(milestone.project_id == project_id, ERROR_INVALID_MILESTONE);
+
+            //verify that the milestone is completed
+            let milestone = self.milestones.read((project_id, milestone_id));
+            assert(milestone.completed, ERROR_MILESTONE_NOT_COMPLETED);
+
+            //check if funds already released
+            // let funds_released = self.milestone_funds_released.read((project_id, milestone_id));
+            // assert(funds_released, ERROR_FUNDS_ALREADY_RELEASED);
+            let request = self.fund_requests.read((project_id, request_id));
+            assert(request.project_id == project_id, ERROR_INVALID_PROJECT_ID);
+            assert(request.status == FundRequestStatus::Pending, ERROR_FUNDS_ALREADY_RELEASED);
+
+            // a unique request_id
+            let request_id = self._fund_request_counter.read();
+            let increased_id = request_id + 1;
+
+            // Create fund request
+            let fund_request = FundRequest {
+                project_id,
+                milestone_id,
+                amount: milestone.milestone_amount.try_into().unwrap(),
+                requester: requester,
+                status: FundRequestStatus::Pending,
             };
-            let mut txs = ArrayTrait::new();
 
-            let mut i = start;
-            while i < end {
-                let tx_id = self.project_transaction_ids.entry(project_id).at(i).read();
-                let tx = self.transactions.read(tx_id);
-                txs.append(tx);
-                i += 1;
-            };
-            Result::Ok((txs, total))
+            // Store the fund request and increase the count
+            let request_id = self.fund_requests_count.read(project_id) + 1;
+            self.fund_requests.write((project_id, request_id), fund_request);
+            self.fund_requests_count.write(project_id, request_id);
+
+            self.milestone_funds_released.write((project_id, milestone_id), true);
+
+            // increment _fund_request_counter
+            self._fund_request_counter.write(increased_id);
+
+            // Emit FundsRequest
+            self
+                .emit(
+                    Event::FundsRequested(FundsRequested { project_id, milestone_id, request_id }),
+                );
+
+            request_id
         }
     }
 
