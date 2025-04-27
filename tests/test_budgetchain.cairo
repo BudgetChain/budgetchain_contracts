@@ -1,4 +1,4 @@
-use budgetchain_contracts::base::types::{Transaction};
+use budgetchain_contracts::base::types::Transaction;
 use budgetchain_contracts::budgetchain::Budget;
 use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
 use snforge_std::{
@@ -74,6 +74,28 @@ fn test_initial_data() {
 
     assert(admin == admin_address, 'incorrect admin');
 }
+
+#[test]
+#[should_panic(expected: 'Caller not authorized')]
+fn test_not_owner_calling_return_fund() {
+    let (contract_address, admin_address) = setup();
+    let org_address = contract_address_const::<'org_addr'>();
+    let project_owner = contract_address_const::<'owner'>();
+    let not_owner = contract_address_const::<'not_owner'>();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    start_cheat_caller_address(dispatcher.contract_address, not_owner);
+    // Set org_address as caller to create project
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org_address, project_owner, 400, array!['Milestone1', 'Milestone2'], array![28, 74],
+        );
+    stop_cheat_caller_address(org_address);
+    // Ensure dispatcher methods exist
+    dispatcher.return_funds(project_owner, project_id, 400);
+}
+
 
 #[test]
 fn test_create_organization() {
@@ -511,6 +533,49 @@ fn test__milestone_completed() {
     let dispatcher = IBudgetDispatcher { contract_address };
 
     dispatcher.check_milestone(caller, 20, 30);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid project ID')]
+fn test__return_funds() {
+    let (contract_address, _admin_address) = setup();
+    let owner = contract_address_const::<'owner'>();
+
+    start_cheat_caller_address(contract_address, owner);
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    dispatcher.return_funds(owner, 0, 30);
+}
+
+#[test]
+#[should_panic(expected: 'Amount cannot be zero')]
+fn test_zero_amount() {
+    let (contract_address, admin_address) = setup();
+
+    let org_address = contract_address_const::<'Organization'>();
+    let proj_owner = contract_address_const::<'owner'>();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    start_cheat_caller_address(contract_address, proj_owner);
+    dispatcher.return_funds(proj_owner, 19, 0);
+}
+
+#[test]
+#[should_panic(expected: 'Amount cannot be zero')]
+fn test_refund_transaction_count() {
+    let (contract_address, admin_address) = setup();
+
+    let org_address = contract_address_const::<'Organization'>();
+    let proj_owner = contract_address_const::<'owner'>();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let count = dispatcher.get_transaction_count();
+    assert(count == 0, 'incorrect deployment');
+
+    start_cheat_caller_address(contract_address, proj_owner);
+    dispatcher.return_funds(proj_owner, 17, 0);
+    assert(count == 1, 'An error occured');
 }
 
 #[test]
