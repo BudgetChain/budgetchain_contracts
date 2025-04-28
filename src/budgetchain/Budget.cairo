@@ -37,6 +37,7 @@ pub mod Budget {
     struct Storage {
         admin: ContractAddress,
         // Transaction storage
+        owner: ContractAddress,
         transaction_count: u64,
         transactions: Map<u64, Transaction>,
         project_count: u64,
@@ -49,7 +50,7 @@ pub mod Budget {
         organizations: Map<u256, Organization>,
         org_addresses: Map<ContractAddress, bool>,
         org_list: Array<Organization>,
-        milestones: Map<(u64, u64), Milestone>, // (project, milestone id) -> Milestone
+        milestones: Map<(u64, u64), Milestone>, // (project id, milestone id) -> Milestone
         org_milestones: Map<ContractAddress, u64>, // org to number of milestones they have
         all_transactions: Vec<Transaction>,
         project_transaction_ids: Map<u64, Vec<u64>>,
@@ -81,7 +82,8 @@ pub mod Budget {
         #[flat]
         SRC5Event: SRC5Component::Event,
         FundsRequested: FundsRequested,
-        OrganizationRemoved: OrganizationRemoved
+        OrganizationRemoved: OrganizationRemoved,
+        FundsReturned: FundsReturned,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -117,6 +119,13 @@ pub mod Budget {
         pub id: u256,
         pub address: ContractAddress,
         pub name: felt252,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct FundsReturned {
+        pub project_id: u64,
+        pub amount: u256,
+        pub project_owner: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -222,6 +231,55 @@ pub mod Budget {
 
             fund_requests_to_return
         }
+
+        fn return_funds(
+            ref self: ContractState, project_owner: ContractAddress, project_id: u64, amount: u256,
+        ) {
+            assert(project_id != 0, 'Invalid project ID');
+            assert(amount > 0, 'Amount cannot be zero');
+
+            let get_project_by_id = self.projects.read(project_id);
+            assert(get_project_by_id.owner == project_owner, ERROR_UNAUTHORIZED);
+
+            // Verify that the project has enough remaining budget
+            assert(get_project_by_id.total_budget >= amount, ERROR_INSUFFICIENT_BUDGET);
+
+            // Update the project's remaining budget
+            let new_budget = get_project_by_id.total_budget - amount;
+            let updated_project = Project {
+                id: get_project_by_id.id,
+                org: get_project_by_id.org,
+                owner: get_project_by_id.owner,
+                total_budget: new_budget,
+            };
+            self.projects.write(project_id, updated_project);
+
+            let transaction_id = self.transaction_count.read() + 1;
+            let transaction = Transaction {
+                id: transaction_id,
+                project_id,
+                sender: project_owner,
+                recipient: get_project_by_id.org,
+                amount: amount.try_into().unwrap(),
+                timestamp: get_block_timestamp(),
+                category: 'FUNDS_RETURNED',
+                description: 'Unused project funds returned',
+            };
+
+            // Create transaction record for the returned funds
+            // Save transaction to transaction history
+            self.all_transactions.append().write(transaction);
+
+            // Save transaction ID to project transaction IDs
+            self.project_transaction_ids.entry(project_id).append().write(transaction_id);
+
+            // Update transaction counter
+            self.transaction_count.write(transaction_id);
+
+            // Emit the FundsReturned event
+            self.emit(Event::FundsReturned(FundsReturned { project_id, amount, project_owner }));
+        }
+
 
         fn get_admin(self: @ContractState) -> ContractAddress {
             self.admin.read()
@@ -638,17 +696,73 @@ pub mod Budget {
 
             self.emit(OrganizationRemoved { org_id: org_id });
         }
-        // fn request_funds(
-    //     ref self: ContractState,
-    //     requester: ContractAddress,
-    //     project_id: u64,
-    //     milestone_id: u64,
-    //     request_id: u64,
-    // ) -> u64 {
-    // Ensure the contract is not paused
-    // self.assert_not_paused();
+        fn request_funds(
+            ref self: ContractState,
+            requester: ContractAddress,
+            project_id: u64,
+            milestone_id: u64,
+            request_id: u64,
+        ) -> u64 {
+            //Ensure the contract is not paused
+            self.assert_not_paused();
 
-        //  }
+            // Verify project exists
+            let project = self.projects.read(project_id);
+            assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
+
+            // Verify caller's authorization
+            // Caller must be either project org or admin
+            assert(
+                requester == self.admin.read() || requester == project.org,
+                ERROR_UNAUTHORIZED_REQUESTER,
+            );
+
+            // Verify milestone exists
+            let milestone = self.milestones.read((project_id, milestone_id));
+            assert(milestone.project_id == project_id, ERROR_INVALID_MILESTONE);
+
+            //verify that the milestone is completed
+            let milestone = self.milestones.read((project_id, milestone_id));
+            assert(milestone.completed, ERROR_MILESTONE_NOT_COMPLETED);
+
+            //check if funds already released
+            // let funds_released = self.milestone_funds_released.read((project_id, milestone_id));
+            // assert(funds_released, ERROR_FUNDS_ALREADY_RELEASED);
+            let request = self.fund_requests.read((project_id, request_id));
+            assert(request.project_id == project_id, ERROR_INVALID_PROJECT_ID);
+            assert(request.status == FundRequestStatus::Pending, ERROR_FUNDS_ALREADY_RELEASED);
+
+            // a unique request_id
+            let request_id = self._fund_request_counter.read();
+            let increased_id = request_id + 1;
+
+            // Create fund request
+            let fund_request = FundRequest {
+                project_id,
+                milestone_id,
+                amount: milestone.milestone_amount.try_into().unwrap(),
+                requester: requester,
+                status: FundRequestStatus::Pending,
+            };
+
+            // Store the fund request and increase the count
+            let request_id = self.fund_requests_count.read(project_id) + 1;
+            self.fund_requests.write((project_id, request_id), fund_request);
+            self.fund_requests_count.write(project_id, request_id);
+
+            self.milestone_funds_released.write((project_id, milestone_id), true);
+
+            // increment _fund_request_counter
+            self._fund_request_counter.write(increased_id);
+
+            // Emit FundsRequest
+            self
+                .emit(
+                    Event::FundsRequested(FundsRequested { project_id, milestone_id, request_id }),
+                );
+
+            request_id
+        }
     }
 
     #[generate_trait]
