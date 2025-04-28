@@ -1353,14 +1353,15 @@ fn test_remove_organization_event_emission() {
     stop_cheat_caller_address(admin_address);
 
     // Verify event emission
-    spy.assert_emitted(
-        @array![
-            (
-                contract_address,
-                Budget::Budget::Event::OrganizationRemoved(
-                    Budget::Budget::OrganizationRemoved { org_id: org_id },
+    spy
+        .assert_emitted(
+            @array![
+                (
+                    contract_address,
+                    Budget::Budget::Event::OrganizationRemoved(
+                        Budget::Budget::OrganizationRemoved { org_id: org_id },
+                    ),
                 ),
-            ),
-        ],
-    );
+            ],
+        );
 }
