@@ -217,10 +217,40 @@ pub mod Budget {
         // ) -> Result<Array<Transaction>, felt252> {}
 
         // New function: Get all transactions for a specific project
-        // fn get_project_transactions(
-        //     self: @ContractState, project_id: u64, page: u64, page_size: u64,
-        // ) -> Result<(Array<Transaction>, u64), felt252> {
-        // }
+
+        fn get_project_transactions(
+            self: @ContractState, project_id: u64, page: u64, page_size: u64,
+        ) -> Result<(Array<Transaction>, u64), felt252> {
+            if page == 0 {
+                return Result::Err(ERROR_INVALID_PAGE);
+            }
+            if page_size == 0 || page_size > 100 {
+                return Result::Err(ERROR_INVALID_PAGE_SIZE);
+            }
+            let total = self.project_transaction_count.read(project_id);
+            if total == 0 {
+                return Result::Err(ERROR_NO_TRANSACTIONS);
+            }
+            let start = (page - 1) * page_size;
+            if start >= total {
+                return Result::Ok((ArrayTrait::new(), total));
+            }
+            let end = if start + page_size > total {
+                total
+            } else {
+                start + page_size
+            };
+            let mut txs = ArrayTrait::new();
+
+            let mut i = start;
+            while i < end {
+                let tx_id = self.project_transaction_ids.entry(project_id).at(i).read();
+                let tx = self.transactions.read(tx_id);
+                txs.append(tx);
+                i += 1;
+            };
+            Result::Ok((txs, total))
+        }
 
         // Retrieves all fund requests for a given project ID.
         fn get_fund_requests(self: @ContractState, project_id: u64) -> Array<FundRequest> {
