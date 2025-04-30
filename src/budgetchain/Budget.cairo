@@ -327,7 +327,7 @@ pub mod Budget {
             while i < milestone_count {
                 sum += *milestone_amounts.at(i.into());
                 i += 1;
-            }
+            };
             assert(sum == total_budget, ERROR_BUDGET_MISMATCH);
 
             let project_id = self.project_count.read();
@@ -355,7 +355,7 @@ pub mod Budget {
                         },
                     );
                 j += 1;
-            }
+            };
 
             self.project_count.write(project_id + 1);
             self.org_milestones.write(org, milestone_count.try_into().unwrap());
