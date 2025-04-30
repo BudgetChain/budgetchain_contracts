@@ -1,4 +1,4 @@
-use budgetchain_contracts::base::types::Transaction;
+use budgetchain_contracts::base::types::{Transaction, TRANSACTION_FUND_RELEASE};
 use budgetchain_contracts::budgetchain::Budget;
 use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispatcherTrait};
 use snforge_std::{
@@ -564,7 +564,7 @@ fn test_zero_amount() {
 #[test]
 #[should_panic(expected: 'Amount cannot be zero')]
 fn test_refund_transaction_count() {
-    let (contract_address, admin_address) = setup();
+    let (contract_address, _) = setup();
 
     let org_address = contract_address_const::<'Organization'>();
     let proj_owner = contract_address_const::<'owner'>();
@@ -585,6 +585,200 @@ fn test_state_change() {
 
     let set_fund_request = dispatcher.set_fund_requests_counter(20);
     assert_eq!(set_fund_request, true);
+}
+
+
+#[test]
+fn test_get_transaction_history_empty() {
+    // Setup contract
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Call the function with valid pagination parameters
+    let result = dispatcher.get_transaction_history(1, 10);
+
+    // Check that the function returns an empty array for a new contract
+    assert(result.is_ok(), 'Result should be Ok');
+    let transactions = result.unwrap();
+    assert(transactions.len() == 0, 'Should return empty array');
+}
+
+#[test]
+#[should_panic(expected: 'Invalid page number')]
+fn test_get_transaction_history_invalid_page_zero() {
+    // Setup contract
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Call with invalid page (0)
+    dispatcher.get_transaction_history(0, 10);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid page size')]
+fn test_get_transaction_history_invalid_page_size_zero() {
+    // Setup contract
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Call with invalid page size (0)
+    dispatcher.get_transaction_history(1, 0);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid page size')]
+fn test_get_transaction_history_invalid_page_size_too_large() {
+    // Setup contract
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Call with invalid page size (> 100)
+    dispatcher.get_transaction_history(1, 101);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid page number')]
+fn test_get_transaction_history_page_beyond_range() {
+    // Setup contract
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
+    let project_id: u64 = 1;
+    let category: felt252 = 'TEST';
+    let description = 'Out of range test';
+
+    // Create 5 transactions
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let mut i = 0_u64;
+    while i < 5_u64 {
+        dispatcher.create_transaction(project_id, recipient, 1000, category, description).unwrap();
+        i += 1_u64;
+    };
+    stop_cheat_caller_address(admin_address);
+
+    // Try to access page 2 with page size 10 (only 5 transactions exist)
+    dispatcher.get_transaction_history(2, 10);
+}
+
+#[test]
+fn test_get_transaction_history_single_transaction() {
+    // Setup contract
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
+    let project_id: u64 = 1;
+    let category: felt252 = 'TEST';
+    let description = 'Single transaction';
+
+    // Create one transaction
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_transaction(project_id, recipient, 1000, category, description).unwrap();
+    stop_cheat_caller_address(admin_address);
+
+    // Retrieve transaction history (page 1, size 10)
+    let result = dispatcher.get_transaction_history(1, 10);
+    assert(result.is_ok(), 'Result should be Ok');
+    let transactions = result.unwrap();
+
+    // Verify results
+    assert(transactions.len() == 1, 'Should return 1 transaction');
+    let tx = *transactions.at(0); // Safe array access
+    assert(tx.id == 0, 'Transaction ID should be 0');
+    assert(tx.project_id == project_id, 'Project ID mismatch');
+    assert(tx.amount == 1000, 'Amount mismatch');
+    assert(tx.category == category, 'Category mismatch');
+    assert(tx.description == description, 'Description mismatch');
+
+    // Verify transaction count
+    let total_count = dispatcher.get_transaction_count();
+    assert(total_count == 1, 'Transaction count should be 1');
+}
+
+#[test]
+fn test_get_transaction_history_max_page_size() {
+    // Setup contract
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
+    let project_id: u64 = 1;
+    let category: felt252 = 'TEST';
+    let description = 'Max page size test';
+
+    // Create 100 transactions
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let mut i = 0_u64;
+    while i < 100_u64 {
+        dispatcher
+            .create_transaction(project_id, recipient, 1000 + i.into(), category, description)
+            .unwrap();
+        i += 1_u64;
+    };
+    stop_cheat_caller_address(admin_address);
+
+    // Retrieve first page with max page size (100)
+    let result = dispatcher.get_transaction_history(1, 100);
+    assert(result.is_ok(), 'Result should be Ok');
+    let transactions = result.unwrap();
+
+    // Verify results
+    assert(transactions.len() == 100, 'Should return 100 transactions');
+    let mut j = 0_u32;
+    while j < 100_u32 {
+        let tx = *transactions.at(j); // Safe array access
+        let expected_id: u64 = j.into();
+        assert(tx.id == expected_id, 'Transaction ID mismatch');
+        assert(tx.amount == (1000 + expected_id).into(), 'Amount mismatch');
+        assert(tx.project_id == project_id, 'Project ID mismatch');
+        assert(tx.category == category, 'Category mismatch');
+        assert(tx.description == description, 'Description mismatch');
+        j += 1_u32;
+    };
+
+    // Verify transaction count
+    let total_count = dispatcher.get_transaction_count();
+    assert(total_count == 100, 'Transaction count should be 100');
+}
+
+#[test]
+fn test_get_transaction_history_after_fund_release() {
+    // Setup project with milestones
+    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create milestone
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let milestone_id = dispatcher
+        .create_milestone(org_address, project_id, 'Test Milestone', total_budget);
+    stop_cheat_caller_address(admin_address);
+
+    // Mark milestone as complete
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    stop_cheat_caller_address(project_owner);
+
+    // Create fund request
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    let request_id = dispatcher.create_fund_request(project_id, milestone_id);
+    stop_cheat_caller_address(project_owner);
+
+    // Release funds
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    dispatcher.release_funds(org_address, project_id, request_id);
+    stop_cheat_caller_address(org_address);
+
+    // Retrieve transaction history
+    let result = dispatcher.get_transaction_history(1, 10);
+    assert(result.is_ok(), 'Result should be Ok');
+    let transactions = result.unwrap();
+
+    // Verify results
+    assert(transactions.len() == 1, 'Should return 1 transaction');
+    let tx = transactions.get(0).unwrap();
+    assert(tx.project_id == project_id, 'Project ID mismatch');
+    assert(tx.amount == total_budget.try_into().unwrap(), 'Amount mismatch');
+    assert(tx.category == TRANSACTION_FUND_RELEASE, 'Category mismatch');
+    assert(tx.description == 'Test Milestone', 'Description mismatch');
 }
 
 #[test]
