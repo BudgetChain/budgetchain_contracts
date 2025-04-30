@@ -1440,3 +1440,90 @@ fn test_project_transaction_count_and_storage() {
     assert(txs.get(1).unwrap().id == 1_u64, 'Second tx id should be 1');
     assert(txs.get(2).unwrap().id == 2_u64, 'Third tx id should be 2');
 }
+
+#[test]
+fn test_remove_organization_success() {
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create an organization first
+    let org_name = 'Test Org';
+    let org_address = contract_address_const::<'Organization'>();
+    let org_mission = 'Testing Budget Chain';
+
+    // Set admin as caller to create organization
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Verify organization is active before removal
+    let org_before = dispatcher.get_organization(org_id);
+    assert(org_before.is_active == true, 'be active before removal');
+
+    // Remove organization as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.remove_organization(org_id);
+    stop_cheat_caller_address(admin_address);
+
+    // Verify organization is inactive after removal
+    let org_after = dispatcher.get_organization(org_id);
+    assert(org_after.is_active == false, 'be inactive after removal');
+}
+
+#[test]
+#[should_panic(expected: 'ONLY ADMIN')]
+fn test_remove_organization_not_admin() {
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create an organization first
+    let org_name = 'Test Org';
+    let org_address = contract_address_const::<'Organization'>();
+    let org_mission = 'Testing Budget Chain';
+
+    // Set admin as caller to create organization
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Try to remove organization as non-admin
+    let non_admin = contract_address_const::<'non_admin'>();
+    cheat_caller_address(contract_address, non_admin, CheatSpan::Indefinite);
+    dispatcher.remove_organization(org_id);
+    stop_cheat_caller_address(non_admin);
+}
+
+#[test]
+fn test_remove_organization_event_emission() {
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let mut spy = spy_events();
+
+    // Create an organization first
+    let org_name = 'Test Org';
+    let org_address = contract_address_const::<'Organization'>();
+    let org_mission = 'Testing Budget Chain';
+
+    // Set admin as caller to create organization
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Remove organization as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.remove_organization(org_id);
+    stop_cheat_caller_address(admin_address);
+
+    // Verify event emission
+    spy
+        .assert_emitted(
+            @array![
+                (
+                    contract_address,
+                    Budget::Budget::Event::OrganizationRemoved(
+                        Budget::Budget::OrganizationRemoved { org_id: org_id },
+                    ),
+                ),
+            ],
+        );
+}

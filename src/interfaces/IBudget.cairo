@@ -42,6 +42,7 @@ pub trait IBudget<TContractState> {
     ) -> u256;
     fn get_organization(self: @TContractState, org_id: u256) -> Organization;
     fn is_authorized_organization(self: @TContractState, org: ContractAddress) -> bool;
+    fn remove_organization(ref self: TContractState, org_id: u256);
 
     // Fund Request Management
     fn get_fund_request(self: @TContractState, project_id: u64, request_id: u64) -> FundRequest;

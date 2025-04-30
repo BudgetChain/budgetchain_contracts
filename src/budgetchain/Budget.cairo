@@ -83,6 +83,7 @@ pub mod Budget {
         #[flat]
         SRC5Event: SRC5Component::Event,
         FundsRequested: FundsRequested,
+        OrganizationRemoved: OrganizationRemoved,
         FundsReturned: FundsReturned,
     }
 
@@ -154,6 +155,11 @@ pub mod Budget {
     pub struct MilestoneCompleted {
         pub project_id: u64,
         pub milestone_id: u64,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct OrganizationRemoved {
+        pub org_id: u256,
     }
 
     #[constructor]
@@ -735,7 +741,16 @@ pub mod Budget {
         fn is_paused(self: @ContractState) -> bool {
             self.is_paused.read()
         }
+        fn remove_organization(ref self: ContractState, org_id: u256) {
+            let caller = get_caller_address();
+            assert(caller == self.admin.read(), ERROR_ONLY_ADMIN);
 
+            let mut org = self.organizations.read(org_id);
+            org.is_active = false;
+            self.organizations.write(org_id, org);
+
+            self.emit(OrganizationRemoved { org_id: org_id });
+        }
         fn request_funds(
             ref self: ContractState,
             requester: ContractAddress,
