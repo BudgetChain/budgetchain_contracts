@@ -1280,6 +1280,168 @@ fn test_get_project_budget_initial() {
 }
 
 #[test]
+fn test_get_project_transactions_basic() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
+    let project_id: u64 = 42;
+    let category: felt252 = project_id.into();
+    let description = 'Test transaction';
+    // Create 5 transactions for the project
+    let mut i = 0_u64;
+    while i < 5_u64 {
+        dispatcher.create_transaction(project_id, recipient, 1000, category, description).unwrap();
+        i += 1_u64;
+    };
+    // Retrieve all transactions (page 1, size 5)
+    let (txs, total) = dispatcher.get_project_transactions(project_id, 1, 5).unwrap();
+
+    assert(total == 5_u64, 'Total should be 5');
+    assert(txs.len() == 5_u32, 'Should return 5 transactions');
+}
+
+#[test]
+fn test_get_project_transactions_pagination_and_integrity() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
+    let project_id: u64 = 42;
+    let category: felt252 = project_id.into();
+    let description = 'Test transaction';
+    // Create 25 transactions for the project
+    let mut i = 0_u64;
+    while i < 25_u64 {
+        let amount: u128 = (1000 + i).into();
+        dispatcher
+            .create_transaction(project_id, recipient, amount, category, description)
+            .unwrap();
+        i += 1_u64;
+    };
+
+    // Retrieve first page (page 1, size 10)
+    let (txs, total) = dispatcher.get_project_transactions(project_id, 1, 10).unwrap();
+    assert(total == 25_u64, 'Total should be 25');
+    assert(txs.len() == 10_u32, 'Should return 10 transactions');
+    // Check data integrity and order
+    let mut j = 0_u32;
+    while j < 10_u32 {
+        let tx = txs.get(j).unwrap();
+        let expected_id: u64 = j.into();
+        let expected_amount: u128 = (1000 + j).into();
+
+        assert(tx.id == expected_id, 'ID mismatch');
+        assert(tx.amount == expected_amount, 'Amount mismatch');
+        assert(tx.category == category, 'Category mismatch');
+        assert(tx.description == description, 'Description mismatch');
+        j += 1_u32;
+    };
+
+    // Retrieve last page (page 3, size 10)
+    let (txs_last, _) = dispatcher.get_project_transactions(project_id, 3, 10).unwrap();
+    assert(txs_last.len() == 5_u32, 'Page should have 5 transactions');
+    // Retrieve out-of-range page (page 4, size 10)
+    let (txs_empty, _) = dispatcher.get_project_transactions(project_id, 4, 10).unwrap();
+    assert(txs_empty.len() == 0_u32, 'Out-of-range, should be empty');
+}
+
+#[test]
+#[should_panic]
+fn test_get_project_transactions_no_transactions() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let project_id: u64 = 9999;
+    dispatcher.get_project_transactions(project_id, 1, 10).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn test_get_project_transactions_invalid_page() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let project_id: u64 = 1;
+    dispatcher.get_project_transactions(project_id, 0, 10).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn test_get_project_transactions_invalid_page_size_zero() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let project_id: u64 = 1;
+    dispatcher.get_project_transactions(project_id, 1, 0).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn test_get_project_transactions_invalid_page_size_too_large() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let project_id: u64 = 1;
+    dispatcher.get_project_transactions(project_id, 1, 101).unwrap();
+}
+
+#[test]
+fn test_get_project_transactions_single_transaction() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
+    let project_id: u64 = 7;
+    let category: felt252 = project_id.into();
+    let description = 'Single transaction';
+    dispatcher.create_transaction(project_id, recipient, 1234, category, description).unwrap();
+    let (txs, total) = dispatcher.get_project_transactions(project_id, 1, 10).unwrap();
+    assert(total == 1_u64, 'Total should be 1');
+    assert(txs.len() == 1_u32, 'Should return 1 transaction');
+    let tx = txs.get(0).unwrap();
+    assert(tx.amount == 1234, 'Amount mismatch');
+    assert(tx.description == description, 'Description mismatch');
+}
+
+#[test]
+fn test_get_project_transactions_multiple_projects_isolation() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
+    let project_id1: u64 = 100;
+    let project_id2: u64 = 200;
+    let category1: felt252 = project_id1.into();
+    let category2: felt252 = project_id2.into();
+    dispatcher.create_transaction(project_id1, recipient, 1, category1, 'P1-T1').unwrap();
+    dispatcher.create_transaction(project_id2, recipient, 2, category2, 'P2-T1').unwrap();
+    dispatcher.create_transaction(project_id1, recipient, 3, category1, 'P1-T2').unwrap();
+    let (txs1, total1) = dispatcher.get_project_transactions(project_id1, 1, 10).unwrap();
+    let (txs2, total2) = dispatcher.get_project_transactions(project_id2, 1, 10).unwrap();
+    assert!(total1 == 2_u64, "Project 1 should have 2 transactions");
+    assert!(total2 == 1_u64, "Project 2 should have 1 transaction");
+    assert!(txs1.len() == 2_u32, "Project 1 should return 2 transactions");
+    assert!(txs2.len() == 1_u32, "Project 2 should return 1 transaction");
+    assert(txs1.get(0).unwrap().description == 'P1-T1', 'Project 1, Tx 1 desc mismatch');
+    assert(txs1.get(1).unwrap().description == 'P1-T2', 'Project 1, Tx 2 desc mismatch');
+    assert(txs2.get(0).unwrap().description == 'P2-T1', 'Project 2, Tx 1 desc mismatch');
+}
+
+#[test]
+fn test_project_transaction_count_and_storage() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let recipient = contract_address_const::<'recipient'>();
+    let project_id: u64 = 55;
+    let category: felt252 = project_id.into();
+    let description = 'Count test';
+    // Add 3 transactions
+    dispatcher.create_transaction(project_id, recipient, 1, category, description).unwrap();
+    dispatcher.create_transaction(project_id, recipient, 2, category, description).unwrap();
+    dispatcher.create_transaction(project_id, recipient, 3, category, description).unwrap();
+    let (txs, total) = dispatcher.get_project_transactions(project_id, 1, 10).unwrap();
+    assert(total == 3_u64, 'Total should be 3');
+    assert(txs.len() == 3_u32, 'Should return 3 transactions');
+    // Check order and IDs
+    assert(txs.get(0).unwrap().id == 0_u64, 'First tx id should be 0');
+    assert(txs.get(1).unwrap().id == 1_u64, 'Second tx id should be 1');
+    assert(txs.get(2).unwrap().id == 2_u64, 'Third tx id should be 2');
+}
+
+#[test]
 fn test_remove_organization_success() {
     let (contract_address, admin_address) = setup();
     let dispatcher = IBudgetDispatcher { contract_address };
