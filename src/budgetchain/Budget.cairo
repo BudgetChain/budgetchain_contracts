@@ -230,30 +230,30 @@ pub mod Budget {
             // Validate input parameters
             assert(page > 0, ERROR_INVALID_PAGE);
             assert(page_size > 0 && page_size <= 100, ERROR_INVALID_PAGE_SIZE);
-            
+
             // Get the total number of transactions
             let transaction_count = self.transaction_count.read();
-            
+
             // If no transactions exist, return an empty array
             if transaction_count == 0 {
                 return Result::Ok(ArrayTrait::new());
             }
-            
+
             // Calculate start and end indices
             let start_index = (page - 1) * page_size;
-            
+
             // Check if the requested page exceeds available data
             assert(start_index < transaction_count, ERROR_INVALID_PAGE);
-            
+
             // Calculate end index (ensuring we don't exceed the transaction count)
             let mut end_index = start_index + page_size;
             if end_index > transaction_count {
                 end_index = transaction_count;
             }
-            
+
             // Create an array to store the transactions
             let mut transactions = ArrayTrait::new();
-            
+
             // Retrieve transactions for the requested page
             let mut current_index = start_index;
             while current_index < end_index {
@@ -262,7 +262,7 @@ pub mod Budget {
                 transactions.append(transaction);
                 current_index += 1;
             };
-            
+
             Result::Ok(transactions)
         }
 

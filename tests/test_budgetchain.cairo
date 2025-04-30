@@ -593,10 +593,10 @@ fn test_get_transaction_history_empty() {
     // Setup contract
     let (contract_address, _) = setup();
     let dispatcher = IBudgetDispatcher { contract_address };
-    
+
     // Call the function with valid pagination parameters
     let result = dispatcher.get_transaction_history(1, 10);
-    
+
     // Check that the function returns an empty array for a new contract
     assert(result.is_ok(), 'Result should be Ok');
     let transactions = result.unwrap();
@@ -609,7 +609,7 @@ fn test_get_transaction_history_invalid_page_zero() {
     // Setup contract
     let (contract_address, _) = setup();
     let dispatcher = IBudgetDispatcher { contract_address };
-    
+
     // Call with invalid page (0)
     dispatcher.get_transaction_history(0, 10);
 }
@@ -620,7 +620,7 @@ fn test_get_transaction_history_invalid_page_size_zero() {
     // Setup contract
     let (contract_address, _) = setup();
     let dispatcher = IBudgetDispatcher { contract_address };
-    
+
     // Call with invalid page size (0)
     dispatcher.get_transaction_history(1, 0);
 }
@@ -631,7 +631,7 @@ fn test_get_transaction_history_invalid_page_size_too_large() {
     // Setup contract
     let (contract_address, _) = setup();
     let dispatcher = IBudgetDispatcher { contract_address };
-    
+
     // Call with invalid page size (> 100)
     dispatcher.get_transaction_history(1, 101);
 }
@@ -651,9 +651,7 @@ fn test_get_transaction_history_page_beyond_range() {
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
     let mut i = 0_u64;
     while i < 5_u64 {
-        dispatcher
-            .create_transaction(project_id, recipient, 1000, category, description)
-            .unwrap();
+        dispatcher.create_transaction(project_id, recipient, 1000, category, description).unwrap();
         i += 1_u64;
     };
     stop_cheat_caller_address(admin_address);
@@ -674,9 +672,7 @@ fn test_get_transaction_history_single_transaction() {
 
     // Create one transaction
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
-    dispatcher
-        .create_transaction(project_id, recipient, 1000, category, description)
-        .unwrap();
+    dispatcher.create_transaction(project_id, recipient, 1000, category, description).unwrap();
     stop_cheat_caller_address(admin_address);
 
     // Retrieve transaction history (page 1, size 10)
