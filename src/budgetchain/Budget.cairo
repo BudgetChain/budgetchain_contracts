@@ -282,7 +282,7 @@ pub mod Budget {
                 let fund_request = self.fund_requests.read((project_id, current_index));
                 fund_requests_to_return.append(fund_request);
                 current_index += 1;
-            }
+            };
 
             fund_requests_to_return
         }
