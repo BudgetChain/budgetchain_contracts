@@ -202,6 +202,9 @@ pub mod Budget {
             self.transactions.write(transaction_id, transaction);
             self.transaction_count.write(transaction_id + 1);
 
+            // Append to all_transactions for get_transaction_history
+            self.all_transactions.append().write(transaction);
+
             // Use category as project_id
             let count = self.project_transaction_count.read(project_id);
             self.project_transaction_ids.entry(project_id).append().write(transaction_id);
@@ -221,9 +224,47 @@ pub mod Budget {
             self.transaction_count.read()
         }
 
-        // fn get_transaction_history(
-        //     self: @ContractState, page: u64, page_size: u64,
-        // ) -> Result<Array<Transaction>, felt252> {}
+        fn get_transaction_history(
+            self: @ContractState, page: u64, page_size: u64,
+        ) -> Result<Array<Transaction>, felt252> {
+            // Validate input parameters
+            assert(page > 0, ERROR_INVALID_PAGE);
+            assert(page_size > 0 && page_size <= 100, ERROR_INVALID_PAGE_SIZE);
+            
+            // Get the total number of transactions
+            let transaction_count = self.transaction_count.read();
+            
+            // If no transactions exist, return an empty array
+            if transaction_count == 0 {
+                return Result::Ok(ArrayTrait::new());
+            }
+            
+            // Calculate start and end indices
+            let start_index = (page - 1) * page_size;
+            
+            // Check if the requested page exceeds available data
+            assert(start_index < transaction_count, ERROR_INVALID_PAGE);
+            
+            // Calculate end index (ensuring we don't exceed the transaction count)
+            let mut end_index = start_index + page_size;
+            if end_index > transaction_count {
+                end_index = transaction_count;
+            }
+            
+            // Create an array to store the transactions
+            let mut transactions = ArrayTrait::new();
+            
+            // Retrieve transactions for the requested page
+            let mut current_index = start_index;
+            while current_index < end_index {
+                // Transactions are stored in a Vec, which is 0-indexed
+                let transaction = self.all_transactions.at(current_index).read();
+                transactions.append(transaction);
+                current_index += 1;
+            };
+            
+            Result::Ok(transactions)
+        }
 
         // New function: Get all transactions for a specific project
 

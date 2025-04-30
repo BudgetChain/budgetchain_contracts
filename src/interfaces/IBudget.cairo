@@ -15,9 +15,9 @@ pub trait IBudget<TContractState> {
         description: felt252,
     ) -> Result<u64, felt252>;
     fn get_transaction(self: @TContractState, id: u64) -> Result<Transaction, felt252>;
-    // fn get_transaction_history(
-    //     self: @TContractState, page: u64, page_size: u64,
-    // ) -> Result<Array<Transaction>, felt252>;
+    fn get_transaction_history(
+        self: @TContractState, page: u64, page_size: u64,
+    ) -> Result<Array<Transaction>, felt252>;
     fn get_transaction_count(self: @TContractState) -> u64;
 
     // Project Management
