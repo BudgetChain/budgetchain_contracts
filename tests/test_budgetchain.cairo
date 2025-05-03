@@ -4,9 +4,9 @@ use budgetchain_contracts::interfaces::IBudget::{IBudgetDispatcher, IBudgetDispa
 use snforge_std::{
     CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
     cheat_caller_address, declare, spy_events, start_cheat_caller_address,
-    stop_cheat_caller_address,
+    stop_cheat_caller_address, start_cheat_block_timestamp,
 };
-use starknet::{ContractAddress, contract_address_const};
+use starknet::{ContractAddress, contract_address_const, get_block_timestamp};
 
 fn setup() -> (ContractAddress, ContractAddress) {
     let admin_address: ContractAddress = contract_address_const::<'admin'>();
@@ -948,6 +948,48 @@ fn test_get_project_remaining_budget_multiple_releases() {
 }
 
 #[test]
+#[should_panic(expected: 'Milestone sum != total budget')]
+fn test_get_project_invalid_total_budget() {
+    // Setup project with no budget
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create organization
+    let org_name = 'Test Org';
+    let org_address = contract_address_const::<'Organization'>();
+    let org_mission = 'Testing Budget Chain';
+
+    // Create project owner
+    let project_owner = contract_address_const::<'ProjectOwner'>();
+
+    // Set admin as caller to create organization
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let _org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Create project with zero budget
+    let total_budget: u256 = 80;
+
+    // Set milestone descriptions and amounts
+    let mut milestone_descriptions = array![
+        'Empty Milestone', 'non empty milestone', 'something else',
+    ];
+    let mut milestone_amounts = array![25, 59, 30];
+
+    // Set org_address as caller to create project
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org_address, project_owner, total_budget, milestone_descriptions, milestone_amounts,
+        );
+    stop_cheat_caller_address(org_address);
+
+    // Test that remaining budget is zero
+    let remaining_budget = dispatcher.get_project_remaining_budget(project_id);
+    assert(remaining_budget == 0, 'Zero budget incorrect');
+}
+
+#[test]
 fn test_get_project_remaining_budget_zero_funding() {
     // Setup project with no budget
     let (contract_address, admin_address) = setup();
@@ -967,11 +1009,13 @@ fn test_get_project_remaining_budget_zero_funding() {
     stop_cheat_caller_address(admin_address);
 
     // Create project with zero budget
-    let total_budget: u256 = 0;
+    let total_budget: u256 = 114;
 
     // Set milestone descriptions and amounts
-    let mut milestone_descriptions = array!['Empty Milestone'];
-    let mut milestone_amounts = array![total_budget];
+    let mut milestone_descriptions = array![
+        'Empty Milestone', 'non empty milestone', 'something else',
+    ];
+    let mut milestone_amounts = array![25, 59, 30];
 
     // Set org_address as caller to create project
     cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
@@ -983,7 +1027,7 @@ fn test_get_project_remaining_budget_zero_funding() {
 
     // Test that remaining budget is zero
     let remaining_budget = dispatcher.get_project_remaining_budget(project_id);
-    assert(remaining_budget == 0, 'Zero budget incorrect');
+    assert(remaining_budget == 114, 'Zero budget incorrect');
 }
 
 #[test]
@@ -1221,7 +1265,7 @@ fn test_functions_should_panic_when_contract_is_done() {
     stop_cheat_caller_address(admin_address);
 
     // Create project with zero budget
-    let total_budget: u256 = 0;
+    let total_budget: u256 = 20;
 
     // Set milestone descriptions and amounts
     let mut milestone_descriptions = array!['Empty Milestone'];
@@ -1287,6 +1331,7 @@ fn test_get_project_budget_full_utilization() {
 }
 
 #[test]
+#[should_panic(expected: 'Invalid budget')]
 fn test_get_project_budget_zero_funding() {
     // Setup project with no budget
     let (contract_address, admin_address) = setup();
@@ -1721,3 +1766,149 @@ fn test_remove_organization_event_emission() {
             ],
         );
 }
+
+#[test]
+#[should_panic(expected: 'Zero address forbidden')]
+fn test_allocate_project_budget_zero_address() {
+    // Setup project with no budget
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create organization
+    let org_name = 'Test Org';
+    let org_address = contract_address_const::<'Organization'>();
+    let org_mission = 'Testing Budget Chain';
+
+    // Create project owner
+    let project_owner = contract_address_const::<0>();
+
+    // Set admin as caller to create organization
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let _org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Create project with zero budget
+    let total_budget: u256 = 40;
+
+    // Set milestone descriptions and amounts
+    let mut milestone_descriptions = array!['Empty Milestone'];
+    let mut milestone_amounts = array![total_budget];
+
+    // Set org_address as caller to create project
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    dispatcher
+        .allocate_project_budget(
+            org_address, project_owner, total_budget, milestone_descriptions, milestone_amounts,
+        );
+    stop_cheat_caller_address(org_address);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid milestone description')]
+fn test_allocate_project_budget_zero_milestone_description() {
+    // Setup project with no budget
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create organization
+    let org_name = 'Test Org';
+    let org_address = contract_address_const::<'Organization'>();
+    let org_mission = 'Testing Budget Chain';
+
+    // Create project owner
+    let project_owner = contract_address_const::<'owner'>();
+
+    // Set admin as caller to create organization
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let _org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Create project with zero budget
+    let total_budget: u256 = 0;
+
+    // Set milestone descriptions and amounts
+    let mut milestone_descriptions = array![];
+    let mut milestone_amounts = array![total_budget];
+
+    // Set org_address as caller to create project
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    dispatcher
+        .allocate_project_budget(
+            org_address, project_owner, total_budget, milestone_descriptions, milestone_amounts,
+        );
+    stop_cheat_caller_address(org_address);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid milestone description')]
+fn test_allocate_project_budget_zero_milestone_amount() {
+    // Setup project with no budget
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create organization
+    let org_name = 'Test Org';
+    let org_address = contract_address_const::<'Organization'>();
+    let org_mission = 'Testing Budget Chain';
+
+    // Create project owner
+    let project_owner = contract_address_const::<'owner'>();
+
+    // Set admin as caller to create organization
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let _org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Create project with zero budget
+    let total_budget: u256 = 60;
+
+    // Set milestone descriptions and amounts
+    let mut milestone_descriptions = array!['milestone description'];
+    let mut milestone_amounts = array![];
+
+    // Set org_address as caller to create project
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    dispatcher
+        .allocate_project_budget(
+            org_address, project_owner, total_budget, milestone_descriptions, milestone_amounts,
+        );
+    stop_cheat_caller_address(org_address);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid budget')]
+fn test_allocate_project_budget_Invalid_budget() {
+    // Setup project with no budget
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create organization
+    let org_name = 'Test Org';
+    let org_address = contract_address_const::<'Organization'>();
+    let org_mission = 'Testing Budget Chain';
+
+    // Create project owner
+    let project_owner = contract_address_const::<'owner'>();
+
+    // Set admin as caller to create organization
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let _org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    stop_cheat_caller_address(admin_address);
+
+    // Create project with zero budget
+    let total_budget: u256 = 0;
+
+    // Set milestone descriptions and amounts
+    let mut milestone_descriptions = array!['milestone description'];
+    let mut milestone_amounts = array![total_budget, 54, 56];
+
+    // Set org_address as caller to create project
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    dispatcher
+        .allocate_project_budget(
+            org_address, project_owner, total_budget, milestone_descriptions, milestone_amounts,
+        );
+    stop_cheat_caller_address(org_address);
+}
+
+
