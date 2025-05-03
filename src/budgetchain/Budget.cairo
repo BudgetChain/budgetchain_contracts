@@ -454,22 +454,24 @@ pub mod Budget {
                             released: false,
                         },
                     );
+                    self
+                    .emit(
+                        MilestoneCreated {
+                            organization: org,
+                            project_id: project_id,
+                            milestone_description: *milestone_descriptions.at(j),
+                            milestone_amount: *milestone_amounts.at(j),
+                            created_at: get_block_timestamp(),
+                        }
+                    );
                 j += 1;
+
             };
 
             self.project_owners.write(project_id, project_owner);
             self.project_count.write(project_id + 1);
             self.org_milestones.write(org, milestone_count.try_into().unwrap());
-            self
-                .emit(
-                    MilestoneCreated {
-                        organization: org,
-                        project_id: project_id,
-                        milestone_description: *milestone_descriptions.at(0),
-                        milestone_amount: *milestone_amounts.at(0),
-                        created_at: get_block_timestamp(),
-                    }
-                );
+         
 
             // Emit event
             self.emit(ProjectAllocated { project_id, org, project_owner, total_budget });

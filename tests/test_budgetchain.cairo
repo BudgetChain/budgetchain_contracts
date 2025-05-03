@@ -1911,4 +1911,71 @@ fn test_allocate_project_budget_Invalid_budget() {
     stop_cheat_caller_address(org_address);
 }
 
+#[test]
+fn test_allocate_project_event() {
+    // Setup project with no budget
+    let (contract_address, admin_address) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+    
+    // Create organization
+    let org_name = 'Test Org';
+    let org_address = contract_address_const::<'Organization'>();
+    let org_mission = 'Testing Budget Chain';
+    
+    // Create project owner
+    let project_owner = contract_address_const::<'owner'>();
+    
+    // Set admin as caller to create organization
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let org_id = dispatcher.create_organization(org_name, org_address, org_mission);
+    stop_cheat_caller_address(admin_address);
+    
+    // Create project with budget
+    let total_budget: u256 = 120;
+    
+    // Set milestone descriptions and amounts
+    let mut milestone_descriptions = array![
+        'milestone description', 'non milestone description', 'yeah',
+    ];
+    let mut milestone_amounts = array![10, 54, 56];
+    
+    // Set block timestamp to a known value (default is 0)
+    // You're not currently setting this in your test, so get_block_timestamp() might be returning 0
+    start_cheat_block_timestamp(contract_address, 500);
+    
+    // Start spy BEFORE calling functions that emit events
+    let mut spy = spy_events();
+    
+    // Set org_address as caller to create project
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    
+    let project_id = dispatcher
+        .allocate_project_budget(
+            org_address,
+            project_owner,
+            total_budget,
+            milestone_descriptions.clone(),
+            milestone_amounts.clone(),
+        );
+    
+    // Check for MilestoneCreated event with correct timestamp (500)
+    spy.assert_emitted(
+        @array![
+            (
+                contract_address,
+                Budget::Budget::Event::MilestoneCreated(
+                    Budget::Budget::MilestoneCreated {
+                        organization: org_address,
+                        project_id: project_id,
+                        milestone_description: *milestone_descriptions.at(0),
+                        milestone_amount: *milestone_amounts.at(0),
+                        created_at: 500,  // Must match the set timestamp
+                    },
+                ),
+            ),
+        ],
+    );
+    
+    stop_cheat_caller_address(org_address);
+}
 
