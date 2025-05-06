@@ -138,7 +138,7 @@ pub mod Budget {
 
     #[derive(Drop, starknet::Event)]
     pub struct MilestoneCreated {
-        pub organization: u256,
+        pub organization: ContractAddress,
         pub project_id: u64,
         pub milestone_description: felt252,
         pub milestone_amount: u256,
@@ -407,6 +407,10 @@ pub mod Budget {
             milestone_descriptions: Array<felt252>,
             milestone_amounts: Array<u256>,
         ) -> u64 {
+            assert(project_owner != contract_address_const::<0>(), ERROR_ZERO_ADDRESS);
+            assert(milestone_descriptions.len() > 0, ERROR_INVALID_MILESTONE_DESCRIPTION);
+            assert(milestone_amounts.len() > 0, ERROR_INVALID_MILESTONE_DESCRIPTION);
+            assert(total_budget > 0, ERROR_INVALID_BUDGET);
             // Ensure the contract is not paused
             self.assert_not_paused();
 
@@ -426,7 +430,7 @@ pub mod Budget {
             };
             assert(sum == total_budget, ERROR_BUDGET_MISMATCH);
 
-            let project_id = self.project_count.read();
+            let project_id = self.project_count.read() + 1;
 
             let new_project = Project {
                 id: project_id, org: org, owner: project_owner, total_budget: total_budget,
@@ -450,9 +454,20 @@ pub mod Budget {
                             released: false,
                         },
                     );
+                self
+                    .emit(
+                        MilestoneCreated {
+                            organization: org,
+                            project_id: project_id,
+                            milestone_description: *milestone_descriptions.at(j),
+                            milestone_amount: *milestone_amounts.at(j),
+                            created_at: get_block_timestamp(),
+                        },
+                    );
                 j += 1;
             };
 
+            self.project_owners.write(project_id, project_owner);
             self.project_count.write(project_id + 1);
             self.org_milestones.write(org, milestone_count.try_into().unwrap());
 

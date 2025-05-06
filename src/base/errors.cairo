@@ -31,3 +31,5 @@ pub const ERROR_MILESTONE_NOT_COMPLETED: felt252 = 'Milestone not completed';
 pub const ERROR_UNAUTHORIZED_REQUESTER: felt252 = 'Only project owner can request';
 pub const ERROR_CONTRACT_PAUSED: felt252 = 'Contract is paused';
 pub const ERROR_ALREADY_PAUSED: felt252 = 'Contract already paused';
+pub const ERROR_INVALID_MILESTONE_DESCRIPTION: felt252 = 'Invalid milestone description';
+pub const ERROR_INVALID_BUDGET: felt252 = 'Invalid budget';
