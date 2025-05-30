@@ -1980,3 +1980,223 @@ fn test_allocate_project_event() {
     stop_cheat_caller_address(org_address);
 }
 
+
+#[test]
+fn test_project_active_status() {
+    // Setup project with milestones
+    let (contract_address, _, _, _, project_id, _) = setup_project_with_milestones();
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+    // Test that project is active after creation
+    let is_active = budget_dispatcher.is_project_active(project_id);
+    assert(is_active == true, 'Project is not active');
+}
+
+#[test]
+#[should_panic(expected: 'Invalid project ID')]
+fn test_project_active_status_for_non_existent_project() {
+    // Setup project with milestones
+    let (contract_address, _, _, _, _, _) = setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+    let non_project = 9999;
+    let is_active = budget_dispatcher.is_project_active(non_project);
+    assert(is_active == true, 'Project is not active');
+}
+
+#[test]
+fn test_project_terminate_as_admin() {
+    // Setup project with milestones
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+    // Terminate project as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    budget_dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+}
+
+#[test]
+fn test_project_should_be_inactive_after_termination() {
+    // Setup project with milestones
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+    // Terminate project as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    budget_dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+
+    // Verify the project is now inactive
+    let is_active = budget_dispatcher.is_project_active(project_id);
+    assert(is_active == false, 'Project meant to be terminated');
+}
+
+#[test]
+#[should_panic(expected: 'Caller is missing role')]
+fn test_project_terminate_as_non_admin() {
+    // Setup project with milestones
+    let (contract_address, _, _, _, project_id, _) = setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+
+    let non_admin = contract_address_const::<'non_admin'>();
+
+    cheat_caller_address(contract_address, non_admin, CheatSpan::Indefinite);
+    budget_dispatcher.terminate_project(project_id);
+    // Try to terminate the project as non-admin
+    stop_cheat_caller_address(non_admin);
+}
+
+#[test]
+#[should_panic(expected: 'Project already terminated')]
+fn test_attempt_project_terminate_for_already_terminated_project() {
+    // Setup project with milestones
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+    // Terminate project as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    budget_dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+
+    //Attempt to terminate again
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    budget_dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid project ID')]
+fn test_attempt_to_terminate_non_existent_project() {
+    // Setup project with milestones
+    let (contract_address, admin_address, _, _, _, _) = setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+    // Terminate project as admin
+    let non_project = 9999;
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    budget_dispatcher.terminate_project(non_project);
+    stop_cheat_caller_address(admin_address);
+}
+
+// Test for emmission of event when project is terminated
+#[test]
+fn test_terminate_project_event_emission() {
+    // Setup project with milestones
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
+
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+
+    let mut spy = spy_events();
+    // Terminate project as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    budget_dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+
+    //Check the event emission
+    spy
+        .assert_emitted(
+            @array![
+                (
+                    contract_address,
+                    Budget::Budget::Event::ProjectTerminated(
+                        Budget::Budget::ProjectTerminated { project_id },
+                    ),
+                ),
+            ],
+        );
+}
+
+
+#[test]
+#[should_panic(expected: 'Project is terminated')]
+fn test_attempt_to_create_milestone_for_terminated_project() {
+       // Setup project with milestones
+    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+
+    // Terminate project as admin
+  cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+  budget_dispatcher.terminate_project(project_id);
+  stop_cheat_caller_address(admin_address);
+
+    // Create milestone
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let milestone_id = budget_dispatcher
+        .create_milestone(org_address, project_id, 'Test Milestone', total_budget);
+    stop_cheat_caller_address(admin_address);
+    
+    // Mark milestone as complete
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    budget_dispatcher.set_milestone_complete(project_id, milestone_id);
+    stop_cheat_caller_address(project_owner);
+
+}
+
+
+#[test]
+#[should_panic(expected: 'Project is terminated')]
+fn test_attempt_to_request_funds_for_terminated_project() {
+      // Setup project with milestones
+    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create milestone
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let milestone_id = budget_dispatcher
+        .create_milestone(org_address, project_id, 'Test Milestone', total_budget);
+    stop_cheat_caller_address(admin_address);
+
+    // Mark milestone as complete
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    budget_dispatcher.set_milestone_complete(project_id, milestone_id);
+    stop_cheat_caller_address(project_owner);
+
+      // Terminate project as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    budget_dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+
+    // Create fund request
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    budget_dispatcher.request_funds(project_owner, project_id, milestone_id, 1);
+    stop_cheat_caller_address(project_owner);
+
+}
+
+
+#[test]
+#[should_panic(expected: 'Project is terminated')]
+fn test_attempt_to_release_funds_for_terminated_project() {
+      // Setup project with milestones
+    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+    let budget_dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create milestone
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let milestone_id = budget_dispatcher
+        .create_milestone(org_address, project_id, 'Test Milestone', total_budget);
+    stop_cheat_caller_address(admin_address);
+
+    // Mark milestone as complete
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    budget_dispatcher.set_milestone_complete(project_id, milestone_id);
+    stop_cheat_caller_address(project_owner);
+
+    // Create fund request
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    let request_id = budget_dispatcher.create_fund_request(project_id, milestone_id);
+    stop_cheat_caller_address(project_owner);
+    
+    // Terminate project as admin
+  cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+  budget_dispatcher.terminate_project(project_id);
+  stop_cheat_caller_address(admin_address);
+    // Release funds
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    budget_dispatcher.release_funds(org_address, project_id, request_id);
+    stop_cheat_caller_address(org_address);
+}
