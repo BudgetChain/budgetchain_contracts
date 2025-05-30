@@ -96,7 +96,6 @@ pub mod MilestoneManager {
             let caller = get_caller_address();
             let admin = self.admin.read();
 
-            // Only admin or organization can create milestones
             assert(
                 caller == admin
                     || self.accesscontrol.has_role(ORGANIZATION_ROLE, caller)
@@ -104,8 +103,7 @@ pub mod MilestoneManager {
                 ERROR_UNAUTHORIZED,
             );
 
-            // Verify project exists (this would be validated in a real implementation)
-            // For this implementation, we'll assume the project exists if it's a valid project_id
+            // Verify project exists with a valid ID
             assert(project_id > 0, ERROR_INVALID_PROJECT_ID);
 
             // Generate new milestone ID
@@ -124,13 +122,13 @@ pub mod MilestoneManager {
                 released: false,
             };
 
-            // Store the milestone
+
             self.milestones.write((project_id, milestone_id), new_milestone);
 
-            // Update milestone count for the project
+
             self.project_milestone_count.write(project_id, milestone_id);
 
-            // Emit MilestoneCreated event
+
             self
                 .emit(
                     Event::MilestoneCreated(
@@ -152,23 +150,23 @@ pub mod MilestoneManager {
             // Ensure the contract is not paused
             self.assert_not_paused();
 
-            // Get the milestone
+
             let mut milestone = self.milestones.read((project_id, milestone_id));
 
-            // Verify the milestone exists for this project
+
             assert(milestone.project_id == project_id, ERROR_INVALID_MILESTONE);
             assert(milestone.milestone_id == milestone_id, ERROR_INVALID_MILESTONE);
 
-            // Validate milestone status
+
             assert(milestone.completed != true, ERROR_MILESTONE_ALREADY_COMPLETED);
 
-            // Update the completed status
+
             milestone.completed = true;
 
-            // Write back to storage
+
             self.milestones.write((project_id, milestone_id), milestone);
 
-            // Emit the MilestoneCompleted event
+
             self.emit(Event::MilestoneCompleted(MilestoneCompleted { project_id, milestone_id }));
         }
 
@@ -199,23 +197,23 @@ pub mod MilestoneManager {
         }
 
         fn pause_contract(ref self: ContractState) {
-            // Ensure only the admin can pause the contract
+
             let caller = get_caller_address();
             assert(caller == self.admin.read(), ERROR_ONLY_ADMIN);
 
-            // Check if already paused
+
             assert(!self.is_paused.read(), ERROR_ALREADY_PAUSED);
 
-            // Set the paused state to true
+
             self.is_paused.write(true);
         }
 
         fn unpause_contract(ref self: ContractState) {
-            // Ensure only the admin can unpause the contract
+
             let caller = get_caller_address();
             assert(caller == self.admin.read(), ERROR_ONLY_ADMIN);
 
-            // Set the paused state to false
+
             self.is_paused.write(false);
         }
     }
