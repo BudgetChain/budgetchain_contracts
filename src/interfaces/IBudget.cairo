@@ -99,4 +99,6 @@ pub trait IBudget<TContractState> {
     fn pause_contract(ref self: TContractState);
     fn unpause_contract(ref self: TContractState);
     fn is_paused(self: @TContractState) -> bool;
+    fn terminate_project(ref self: TContractState, project_id: u64);
+    fn is_project_active(self: @TContractState, project_id: u64) -> bool;
 }

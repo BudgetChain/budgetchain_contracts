@@ -65,6 +65,7 @@ pub mod Budget {
         project_owners: LegacyMap<u64, ContractAddress>,
         milestone_statuses: LegacyMap<(u64, u64), bool>,
         is_paused: bool,
+        project_status: Map<u64, bool> // true = active, false = terminated
     }
 
 
@@ -85,6 +86,7 @@ pub mod Budget {
         FundsRequested: FundsRequested,
         OrganizationRemoved: OrganizationRemoved,
         FundsReturned: FundsReturned,
+        ProjectTerminated: ProjectTerminated,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -162,6 +164,10 @@ pub mod Budget {
         pub org_id: u256,
     }
 
+    #[derive(Drop, starknet::Event)]
+    pub struct ProjectTerminated {
+        pub project_id: u64,
+    }
     #[constructor]
     fn constructor(ref self: ContractState, default_admin: ContractAddress) {
         assert(default_admin != contract_address_const::<0>(), ERROR_ZERO_ADDRESS);
@@ -190,6 +196,9 @@ pub mod Budget {
         ) -> Result<u64, felt252> {
             // Ensure the contract is not paused
             self.assert_not_paused();
+
+            // Ensure the project is active
+            self.assert_project_active(project_id);
 
             // Generate new transaction ID
             let transaction_id = self.transaction_count.read();
@@ -334,6 +343,9 @@ pub mod Budget {
             assert(project_id != 0, 'Invalid project ID');
             assert(amount > 0, 'Amount cannot be zero');
 
+            // Ensure the project is active
+            self.assert_project_active(project_id);
+
             let get_project_by_id = self.projects.read(project_id);
             assert(get_project_by_id.owner == project_owner, ERROR_UNAUTHORIZED);
 
@@ -474,6 +486,9 @@ pub mod Budget {
             // Emit event
             self.emit(ProjectAllocated { project_id, org, project_owner, total_budget });
 
+            // Set project status to be true
+            self.project_status.write(project_id, true);
+
             project_id
         }
 
@@ -524,8 +539,11 @@ pub mod Budget {
             let admin = self.admin.read();
             assert(admin == get_caller_address(), ERROR_ONLY_ADMIN);
 
+             // Ensure the project is active
+            self.assert_project_active(project_id);
+            
             let created_at = get_block_timestamp();
-
+            
             let new_milestone: Milestone = Milestone {
                 organization: org,
                 project_id: project_id,
@@ -649,6 +667,10 @@ pub mod Budget {
         ) {
             // Ensure the contract is not paused
             self.assert_not_paused();
+
+            // Ensure the project is active
+            self.assert_project_active(project_id);
+
             // Verify caller is an authorized organization
             self.accesscontrol.assert_only_role(ORGANIZATION_ROLE);
 
@@ -817,6 +839,9 @@ pub mod Budget {
             //Ensure the contract is not paused
             self.assert_not_paused();
 
+            // Ensure the project is active
+            self.assert_project_active(project_id);
+
             // Verify project exists
             let project = self.projects.read(project_id);
             assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
@@ -874,7 +899,34 @@ pub mod Budget {
 
             request_id
         }
+
+        fn is_project_active(self: @ContractState, project_id: u64) -> bool {
+            // Check that project exists
+            let project = self.projects.read(project_id);
+            assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
+            // Check if project is active
+            self.project_status.read(project_id)
+        }
+
+        fn terminate_project(ref self: ContractState, project_id: u64) {
+            // Only admin can terminate project
+            self.accesscontrol.assert_only_role(ADMIN_ROLE);
+            // Check that the project exists
+            let project = self.projects.read(project_id);
+            assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
+
+            // Check if project is terminated
+            let is_active = self.project_status.read(project_id);
+            assert(is_active != false, ERROR_PROJECT_ALREADY_TERMINATED);
+
+            // Terminate the project
+            self.project_status.write(project_id, false);
+
+            // Emit event
+            self.emit(Event::ProjectTerminated(ProjectTerminated { project_id }));
+        }
     }
+
 
     #[generate_trait]
     pub impl Internal of InternalTrait {
@@ -883,6 +935,15 @@ pub mod Budget {
         // - Can only be called by other functions within the contract
         fn assert_not_paused(self: @ContractState) {
             assert(!self.is_paused.read(), ERROR_CONTRACT_PAUSED);
+        }
+        // Internal helper function
+        fn assert_project_active(self: @ContractState, project_id: u64) {
+            //Check that project exists
+            let project = self.projects.read(project_id);
+            assert(project.org != contract_address_const::<0>(), ERROR_INVALID_PROJECT_ID);
+            //check if project is active
+            let is_active = self.project_status.read(project_id) == false;
+            assert(!is_active, ERROR_PROJECT_TERMINATED);
         }
     }
 }
