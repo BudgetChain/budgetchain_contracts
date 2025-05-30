@@ -447,6 +447,7 @@ pub mod Budget {
                         Milestone {
                             organization: org,
                             project_id: project_id,
+                            milestone_id: j.into() + 1,
                             milestone_description: *milestone_descriptions.at(j),
                             milestone_amount: *milestone_amounts.at(j),
                             created_at: get_block_timestamp(),
@@ -526,17 +527,19 @@ pub mod Budget {
 
             let created_at = get_block_timestamp();
 
+            // Read the number of the current milestones the organization has
+            let current_milestone = self.org_milestones.read(org);
+
             let new_milestone: Milestone = Milestone {
                 organization: org,
                 project_id: project_id,
+                milestone_id: current_milestone + 1,
                 milestone_description: milestone_description,
                 milestone_amount: milestone_amount,
                 created_at: created_at,
                 completed: false,
                 released: false,
             };
-            // // read the number of the current milestones the organization has
-            let current_milestone = self.org_milestones.read(org);
 
             self.milestones.write((project_id, current_milestone + 1), new_milestone);
             self.org_milestones.write(org, current_milestone + 1);
