@@ -121,14 +121,8 @@ pub mod MilestoneManager {
                 completed: false,
                 released: false,
             };
-
-
             self.milestones.write((project_id, milestone_id), new_milestone);
-
-
             self.project_milestone_count.write(project_id, milestone_id);
-
-
             self
                 .emit(
                     Event::MilestoneCreated(
@@ -142,31 +136,18 @@ pub mod MilestoneManager {
                         },
                     ),
                 );
-
             milestone_id
         }
 
         fn set_milestone_complete(ref self: ContractState, project_id: u64, milestone_id: u64) {
             // Ensure the contract is not paused
             self.assert_not_paused();
-
-
             let mut milestone = self.milestones.read((project_id, milestone_id));
-
-
             assert(milestone.project_id == project_id, ERROR_INVALID_MILESTONE);
             assert(milestone.milestone_id == milestone_id, ERROR_INVALID_MILESTONE);
-
-
             assert(milestone.completed != true, ERROR_MILESTONE_ALREADY_COMPLETED);
-
-
             milestone.completed = true;
-
-
             self.milestones.write((project_id, milestone_id), milestone);
-
-
             self.emit(Event::MilestoneCompleted(MilestoneCompleted { project_id, milestone_id }));
         }
 
@@ -177,14 +158,12 @@ pub mod MilestoneManager {
         fn get_project_milestones(self: @ContractState, project_id: u64) -> Array<Milestone> {
             let mut milestones = ArrayTrait::new();
             let milestone_count = self.project_milestone_count.read(project_id);
-
             let mut i: u64 = 1;
             while i <= milestone_count {
                 let milestone = self.milestones.read((project_id, i));
                 milestones.append(milestone);
                 i += 1;
-            };
-
+            }
             milestones
         }
 
@@ -197,23 +176,15 @@ pub mod MilestoneManager {
         }
 
         fn pause_contract(ref self: ContractState) {
-
             let caller = get_caller_address();
             assert(caller == self.admin.read(), ERROR_ONLY_ADMIN);
-
-
             assert(!self.is_paused.read(), ERROR_ALREADY_PAUSED);
-
-
             self.is_paused.write(true);
         }
 
         fn unpause_contract(ref self: ContractState) {
-
             let caller = get_caller_address();
             assert(caller == self.admin.read(), ERROR_ONLY_ADMIN);
-
-
             self.is_paused.write(false);
         }
     }
