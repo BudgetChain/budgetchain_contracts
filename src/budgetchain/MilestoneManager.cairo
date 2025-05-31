@@ -163,7 +163,7 @@ pub mod MilestoneManager {
                 let milestone = self.milestones.read((project_id, i));
                 milestones.append(milestone);
                 i += 1;
-            }
+            };
             milestones
         }
 
