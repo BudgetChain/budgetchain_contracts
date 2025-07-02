@@ -200,7 +200,7 @@ pub mod Budget {
 
             // Ensure project is active
             self._assert_project_active(project_id);
-            
+
             // Generate new transaction ID
             let transaction_id = self.transaction_count.read();
             let sender = get_caller_address();
@@ -908,7 +908,7 @@ pub mod Budget {
             let caller = get_caller_address();
             assert(caller == self.admin.read(), ERROR_ONLY_ADMIN);
 
-             let mut project = self.projects.read(project_id);
+            let mut project = self.projects.read(project_id);
             assert(project.id == project_id, ERROR_INVALID_PROJECT_ID);
 
             // Check if project is already terminated
@@ -936,10 +936,9 @@ pub mod Budget {
         }
 
         fn _assert_project_active(self: @ContractState, project_id: u64) {
-            // Check if the project is active 
+            // Check if the project is active
             let project_status = self.project_status.read(project_id);
             assert(project_status == true, ERROR_PROJECT_TERMINATED);
-
-            }
+        }
     }
 }

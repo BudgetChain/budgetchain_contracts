@@ -193,7 +193,6 @@ fn test_create_milestone_successfully() {
     // let (contract_address, admin_address) = setup();
     let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
 
-
     let dispatcher = IBudgetDispatcher { contract_address };
 
     let name = 'John';
@@ -643,8 +642,7 @@ fn test_get_transaction_history_invalid_page_size_too_large() {
 #[should_panic(expected: 'Invalid page number')]
 fn test_get_transaction_history_page_beyond_range() {
     // Setup contract
-     let (contract_address, admin_address, _, _, project_id, _) =
-        setup_project_with_milestones();
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
     let project_id: u64 = project_id;
@@ -667,8 +665,7 @@ fn test_get_transaction_history_page_beyond_range() {
 #[test]
 fn test_get_transaction_history_single_transaction() {
     // Setup contract
-    let (contract_address, admin_address, _, _, project_id, _) =
-        setup_project_with_milestones();
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
     let project_id: u64 = project_id;
@@ -702,8 +699,7 @@ fn test_get_transaction_history_single_transaction() {
 #[test]
 fn test_get_transaction_history_max_page_size() {
     // Setup contract
-    let (contract_address, admin_address, _, _, project_id, _) =
-        setup_project_with_milestones();
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
     let project_id: u64 = project_id;
@@ -1603,7 +1599,7 @@ fn test_get_project_transactions_no_transactions() {
 #[test]
 #[should_panic]
 fn test_get_project_transactions_invalid_page() {
-     let (contract_address, _admin_address, _org_address, _project_owner, project_id, _) =
+    let (contract_address, _admin_address, _org_address, _project_owner, project_id, _) =
         setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let project_id: u64 = project_id;
@@ -1631,8 +1627,7 @@ fn test_get_project_transactions_invalid_page_size_too_large() {
 #[test]
 fn test_get_project_transactions_single_transaction() {
     // let (contract_address, _) = setup();
-    let (contract_address, _, _, _, project_id, _) =
-        setup_project_with_milestones();
+    let (contract_address, _, _, _, project_id, _) = setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
     let project_id: u64 = project_id;
@@ -1653,46 +1648,46 @@ fn test_get_project_transactions_multiple_projects_isolationv2() {
     // Setup project with milestones
     let (contract_address, _, org_address, project_owner, project_id, _) =
         setup_project_with_milestones();
-        
-        let dispatcher = IBudgetDispatcher { contract_address };
 
-        // Create another project to get another project_id with project status set to true 
-    
-        // Create a second project in the same contract
-        cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
-        let project_id2 = dispatcher.allocate_project_budget(
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create another project to get another project_id with project status set to true
+
+    // Create a second project in the same contract
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    let project_id2 = dispatcher
+        .allocate_project_budget(
             org_address,
             project_owner,
             2000, // different budget
             array!['Second Project Milestone'],
-            array![2000]
+            array![2000],
         );
-        stop_cheat_caller_address(org_address);
+    stop_cheat_caller_address(org_address);
 
     let recipient = contract_address_const::<'recipient'>();
     let project_id1 = project_id;
     let project_id2 = project_id2;
-   let category1: felt252 = project_id1.into();
+    let category1: felt252 = project_id1.into();
     let category2: felt252 = project_id2.into();
     dispatcher.create_transaction(project_id1, recipient, 1, category1, 'P1-T1').unwrap();
-   dispatcher.create_transaction(project_id2, recipient, 2, category2, 'P2-T1').unwrap();
-     dispatcher.create_transaction(project_id1, recipient, 3, category1, 'P1-T2').unwrap();
+    dispatcher.create_transaction(project_id2, recipient, 2, category2, 'P2-T1').unwrap();
+    dispatcher.create_transaction(project_id1, recipient, 3, category1, 'P1-T2').unwrap();
     let (txs1, total1) = dispatcher.get_project_transactions(project_id1, 1, 10).unwrap();
     let (txs2, total2) = dispatcher.get_project_transactions(project_id2, 1, 10).unwrap();
-     assert!(total1 == 2_u64, "Project 1 should have 2 transactions");
-     assert!(total2 == 1_u64, "Project 2 should have 1 transaction");
+    assert!(total1 == 2_u64, "Project 1 should have 2 transactions");
+    assert!(total2 == 1_u64, "Project 2 should have 1 transaction");
     assert!(txs1.len() == 2_u32, "Project 1 should return 2 transactions");
-     assert!(txs2.len() == 1_u32, "Project 2 should return 1 transaction");
+    assert!(txs2.len() == 1_u32, "Project 2 should return 1 transaction");
     assert(txs1.get(0).unwrap().description == 'P1-T1', 'Project 1, Tx 1 desc mismatch');
     assert(txs1.get(1).unwrap().description == 'P1-T2', 'Project 1, Tx 2 desc mismatch');
-     assert(txs2.get(0).unwrap().description == 'P2-T1', 'Project 2, Tx 1 desc mismatch');
+    assert(txs2.get(0).unwrap().description == 'P2-T1', 'Project 2, Tx 1 desc mismatch');
 }
 
 #[test]
 fn test_project_transaction_count_and_storage() {
     // Setup project
-    let (contract_address, _, _, _, project_id, _) =
-        setup_project_with_milestones();
+    let (contract_address, _, _, _, project_id, _) = setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
     let project_id: u64 = project_id;
@@ -2124,7 +2119,7 @@ fn test_create_fund_request_on_terminated_project() {
         .create_milestone(org_address, project_id, 'Full Budget Milestone', total_budget);
     stop_cheat_caller_address(admin_address);
 
-     // Mark milestone as complete
+    // Mark milestone as complete
     cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
     dispatcher.set_milestone_complete(project_id, milestone_id);
     stop_cheat_caller_address(project_owner);
@@ -2145,9 +2140,8 @@ fn test_create_fund_request_on_terminated_project() {
 }
 
 #[test]
-#[should_panic(expected:'Project is terminated')]
+#[should_panic(expected: 'Project is terminated')]
 fn test_attempt_to_create_multiple_milestones_after_termination() {
- 
     let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
     let (_, _, _, _, project_id2, _) = setup_project_with_milestones();
 
@@ -2162,8 +2156,7 @@ fn test_attempt_to_create_multiple_milestones_after_termination() {
     dispatcher.create_milestone(org_address, project_id, 'Feed Dogs in Lekki', 2);
     stop_cheat_caller_address(admin_address);
 
-
-     // Terminate project as admin
+    // Terminate project as admin
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
     dispatcher.terminate_project(project_id);
     stop_cheat_caller_address(admin_address);
