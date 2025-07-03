@@ -190,7 +190,8 @@ fn test_create_two_organization() {
 
 #[test]
 fn test_create_milestone_successfully() {
-    let (contract_address, admin_address) = setup();
+    // let (contract_address, admin_address) = setup();
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
 
     let dispatcher = IBudgetDispatcher { contract_address };
 
@@ -200,13 +201,15 @@ fn test_create_milestone_successfully() {
 
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
     let _org0_id = dispatcher.create_organization(name, org_address, mission);
-    dispatcher.create_milestone(org_address, 12, 'Feed Dogs in Lekki', 2);
+    dispatcher.create_milestone(org_address, project_id, 'Feed Dogs in Lekki', 2);
     stop_cheat_caller_address(admin_address);
 }
 
 #[test]
 fn test_create_multiple_milestone_successfully() {
-    let (contract_address, admin_address) = setup();
+    // let (contract_address, admin_address) = setup();
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
+    let (_, _, _, _, project_id2, _) = setup_project_with_milestones();
 
     let dispatcher = IBudgetDispatcher { contract_address };
 
@@ -216,8 +219,8 @@ fn test_create_multiple_milestone_successfully() {
 
     cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
     let _org0_id = dispatcher.create_organization(name, org_address, mission);
-    dispatcher.create_milestone(org_address, 12, 'Feed Dogs in Lekki', 2);
-    dispatcher.create_milestone(org_address, 18, 'Feed Dogs in Kubwa', 20);
+    dispatcher.create_milestone(org_address, project_id, 'Feed Dogs in Lekki', 2);
+    dispatcher.create_milestone(org_address, project_id2, 'Feed Dogs in Kubwa', 20);
     stop_cheat_caller_address(admin_address);
 }
 
@@ -245,14 +248,13 @@ fn test_create_milestone_should_panic_if_not_organization() {
 
 #[test]
 fn test_create_milestone_data_saved() {
-    let (contract_address, admin_address) = setup();
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
 
     let dispatcher = IBudgetDispatcher { contract_address };
 
     let name = 'John';
     let org_address = contract_address_const::<'Organization 1'>();
     let mission = 'Help the Poor';
-    let project_id = 12;
     let milestone_description = 'Feed Dogs in Lekki';
     let milestone_amount = 2;
 
@@ -265,7 +267,7 @@ fn test_create_milestone_data_saved() {
     let first_milestone = dispatcher.get_milestone(project_id, milestone_id);
     assert(milestone_id == 1, 'Milestone not saved');
     assert(first_milestone.organization == org_address, 'Org didnt create the miestone');
-    assert(first_milestone.project_id == 12, 'Org project id didnt match');
+    assert(first_milestone.project_id == project_id, 'Org project id didnt match');
     assert(
         first_milestone.milestone_description == milestone_description,
         'Org description id didnt match',
@@ -640,10 +642,10 @@ fn test_get_transaction_history_invalid_page_size_too_large() {
 #[should_panic(expected: 'Invalid page number')]
 fn test_get_transaction_history_page_beyond_range() {
     // Setup contract
-    let (contract_address, admin_address) = setup();
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
-    let project_id: u64 = 1;
+    let project_id: u64 = project_id;
     let category: felt252 = 'TEST';
     let description = 'Out of range test';
 
@@ -663,10 +665,10 @@ fn test_get_transaction_history_page_beyond_range() {
 #[test]
 fn test_get_transaction_history_single_transaction() {
     // Setup contract
-    let (contract_address, admin_address) = setup();
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
-    let project_id: u64 = 1;
+    let project_id: u64 = project_id;
     let category: felt252 = 'TEST';
     let description = 'Single transaction';
 
@@ -697,10 +699,10 @@ fn test_get_transaction_history_single_transaction() {
 #[test]
 fn test_get_transaction_history_max_page_size() {
     // Setup contract
-    let (contract_address, admin_address) = setup();
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
-    let project_id: u64 = 1;
+    let project_id: u64 = project_id;
     let category: felt252 = 'TEST';
     let description = 'Max page size test';
 
@@ -1520,10 +1522,11 @@ fn test_get_project_budget_initial() {
 
 #[test]
 fn test_get_project_transactions_basic() {
-    let (contract_address, _) = setup();
+    let (contract_address, _admin_address, _org_address, _project_owner, project_id, _) =
+        setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
-    let project_id: u64 = 42;
+    let project_id: u64 = project_id;
     let category: felt252 = project_id.into();
     let description = 'Test transaction';
     // Create 5 transactions for the project
@@ -1541,10 +1544,11 @@ fn test_get_project_transactions_basic() {
 
 #[test]
 fn test_get_project_transactions_pagination_and_integrity() {
-    let (contract_address, _) = setup();
+    let (contract_address, _admin_address, _org_address, _project_owner, project_id, _) =
+        setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
-    let project_id: u64 = 42;
+    let project_id: u64 = project_id;
     let category: felt252 = project_id.into();
     let description = 'Test transaction';
     // Create 25 transactions for the project
@@ -1595,9 +1599,10 @@ fn test_get_project_transactions_no_transactions() {
 #[test]
 #[should_panic]
 fn test_get_project_transactions_invalid_page() {
-    let (contract_address, _) = setup();
+    let (contract_address, _admin_address, _org_address, _project_owner, project_id, _) =
+        setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
-    let project_id: u64 = 1;
+    let project_id: u64 = project_id;
     dispatcher.get_project_transactions(project_id, 0, 10).unwrap();
 }
 
@@ -1621,10 +1626,11 @@ fn test_get_project_transactions_invalid_page_size_too_large() {
 
 #[test]
 fn test_get_project_transactions_single_transaction() {
-    let (contract_address, _) = setup();
+    // let (contract_address, _) = setup();
+    let (contract_address, _, _, _, project_id, _) = setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
-    let project_id: u64 = 7;
+    let project_id: u64 = project_id;
     let category: felt252 = project_id.into();
     let description = 'Single transaction';
     dispatcher.create_transaction(project_id, recipient, 1234, category, description).unwrap();
@@ -1637,12 +1643,31 @@ fn test_get_project_transactions_single_transaction() {
 }
 
 #[test]
-fn test_get_project_transactions_multiple_projects_isolation() {
-    let (contract_address, _) = setup();
+fn test_get_project_transactions_multiple_projects_isolationv2() {
+    // let (contract_address, _) = setup();
+    // Setup project with milestones
+    let (contract_address, _, org_address, project_owner, project_id, _) =
+        setup_project_with_milestones();
+
     let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create another project to get another project_id with project status set to true
+
+    // Create a second project in the same contract
+    cheat_caller_address(contract_address, org_address, CheatSpan::Indefinite);
+    let project_id2 = dispatcher
+        .allocate_project_budget(
+            org_address,
+            project_owner,
+            2000, // different budget
+            array!['Second Project Milestone'],
+            array![2000],
+        );
+    stop_cheat_caller_address(org_address);
+
     let recipient = contract_address_const::<'recipient'>();
-    let project_id1: u64 = 100;
-    let project_id2: u64 = 200;
+    let project_id1 = project_id;
+    let project_id2 = project_id2;
     let category1: felt252 = project_id1.into();
     let category2: felt252 = project_id2.into();
     dispatcher.create_transaction(project_id1, recipient, 1, category1, 'P1-T1').unwrap();
@@ -1661,10 +1686,11 @@ fn test_get_project_transactions_multiple_projects_isolation() {
 
 #[test]
 fn test_project_transaction_count_and_storage() {
-    let (contract_address, _) = setup();
+    // Setup project
+    let (contract_address, _, _, _, project_id, _) = setup_project_with_milestones();
     let dispatcher = IBudgetDispatcher { contract_address };
     let recipient = contract_address_const::<'recipient'>();
-    let project_id: u64 = 55;
+    let project_id: u64 = project_id;
     let category: felt252 = project_id.into();
     let description = 'Count test';
     // Add 3 transactions
@@ -1978,5 +2004,165 @@ fn test_allocate_project_event() {
         );
 
     stop_cheat_caller_address(org_address);
+}
+
+
+#[test]
+fn test_project_active_by_default() {
+    // Setup project with milestones
+    let (contract_address, _, _, _, project_id, _) = setup_project_with_milestones();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Verify project is active by default (not terminated)
+    let status_before = dispatcher.assert_status(project_id);
+    assert(status_before == true, 'Project to be active by default');
+}
+
+#[test]
+fn test_terminate_project() {
+    // Setup project with milestones
+    let (contract_address, admin_address, org_address, _, project_id, total_budget) =
+        setup_project_with_milestones();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create one milestone for the full budget
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let milestone_id = dispatcher
+        .create_milestone(org_address, project_id, 'Full Budget Milestone', total_budget);
+    stop_cheat_caller_address(admin_address);
+
+    // Verify project is active initially
+    let status_before = dispatcher.assert_status(project_id);
+    assert(status_before == true, 'Project is not active');
+
+    // Terminate project as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+
+    // Verify project is now terminated
+    let status_after = dispatcher.assert_status(project_id);
+    assert(status_after == false, 'Project should be terminated');
+}
+
+#[test]
+fn test_assert_status_nonexistent_project() {
+    let (contract_address, _) = setup();
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Check non-existent project
+    let status_before = dispatcher.assert_status(999);
+    assert(status_before == false, 'Non-project cant be terminated');
+}
+
+#[test]
+#[should_panic(expected: 'Project already terminated')]
+fn test_terminate_project_already_terminated() {
+    // Setup project with milestones
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Terminate project first time
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+
+    // Try to terminate again (should fail)
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+}
+
+#[test]
+fn test_terminate_project_event_emission() {
+    // Setup project with milestones
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+    let mut spy = spy_events();
+
+    // Terminate project as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+
+    // Verify event emission
+    spy
+        .assert_emitted(
+            @array![
+                (
+                    contract_address,
+                    Budget::Budget::Event::ProjectTerminated(
+                        Budget::Budget::ProjectTerminated { project_id },
+                    ),
+                ),
+            ],
+        );
+}
+
+
+#[test]
+#[should_panic(expected: 'Project is terminated')]
+fn test_create_fund_request_on_terminated_project() {
+    // Setup project with milestones
+    let (contract_address, admin_address, org_address, project_owner, project_id, total_budget) =
+        setup_project_with_milestones();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    // Create one milestone for the full budget
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let milestone_id = dispatcher
+        .create_milestone(org_address, project_id, 'Full Budget Milestone', total_budget);
+    stop_cheat_caller_address(admin_address);
+
+    // Mark milestone as complete
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    dispatcher.set_milestone_complete(project_id, milestone_id);
+    stop_cheat_caller_address(project_owner);
+
+    // Verify project is active initially
+    let status_before = dispatcher.assert_status(project_id);
+    assert(status_before == true, 'Project is not active');
+
+    // Terminate project as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+
+    // Try to create fund request on terminated project
+    cheat_caller_address(contract_address, project_owner, CheatSpan::Indefinite);
+    dispatcher.create_fund_request(project_id, milestone_id);
+    stop_cheat_caller_address(project_owner);
+}
+
+#[test]
+#[should_panic(expected: 'Project is terminated')]
+fn test_attempt_to_create_multiple_milestones_after_termination() {
+    let (contract_address, admin_address, _, _, project_id, _) = setup_project_with_milestones();
+    let (_, _, _, _, project_id2, _) = setup_project_with_milestones();
+
+    let dispatcher = IBudgetDispatcher { contract_address };
+
+    let name = 'Dinah';
+    let org_address = contract_address_const::<'Organization 1'>();
+    let mission = 'Help the Poor';
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    let _org0_id = dispatcher.create_organization(name, org_address, mission);
+    dispatcher.create_milestone(org_address, project_id, 'Feed Dogs in Lekki', 2);
+    stop_cheat_caller_address(admin_address);
+
+    // Terminate project as admin
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.terminate_project(project_id);
+    stop_cheat_caller_address(admin_address);
+
+    cheat_caller_address(contract_address, admin_address, CheatSpan::Indefinite);
+    dispatcher.create_milestone(org_address, project_id2, 'Feed Dogs in Kubwa', 20);
+    stop_cheat_caller_address(admin_address);
 }
 
